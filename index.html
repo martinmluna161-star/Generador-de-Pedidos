@@ -46,6 +46,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--texto);mi
 .banner{display:flex;align-items:center;gap:14px;padding:16px 20px;border-radius:12px;margin-bottom:18px;flex-wrap:wrap;}
 .banner.ok{background:var(--teal-c);border:1px solid #9BD9C4;}
 .banner.warn{background:var(--amber-c);border:1px solid #EFC77C;}
+.banner.err{background:var(--rojo-c);border:1px solid #EFAAA4;}
+.periodo-chip{display:inline-flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;background:white;border-radius:8px;padding:6px 12px;margin:0 4px;}
 .banner .b-icon{font-size:22px;}
 .banner .b-text{flex:1;font-size:13px;color:var(--texto);}
 .banner .b-text b{color:var(--azul);}
@@ -213,6 +215,8 @@ input.comprar-input.tiene-valor{border-color:var(--teal);background:var(--teal-c
       </div>
     </div>
 
+    <div id="periodo-banner"></div>
+
     <div class="cfg-row">
       <div class="cfg-field">
         <label>Días cubiertos (ventas)</label>
@@ -229,7 +233,7 @@ input.comprar-input.tiene-valor{border-color:var(--teal);background:var(--teal-c
       <div class="cfg-note"><b>Días cubiertos:</b> el rango real que exportaste en los archivos de ventas. Si no son 7 días exactos, se proyecta a 7 días con un promedio diario.</div>
       <div class="cfg-note"><b>Stock a usar:</b> por defecto "Disponible p/venta" (Depósito − Reservado), lo que hoy se puede vender.</div>
       <div class="spacer"></div>
-      <button class="btn btn-teal btn-sm" id="btn-procesar" onclick="procesarYSubir()" disabled>Procesar y guardar ciclo</button>
+      <button class="btn btn-teal btn-sm" id="btn-procesar" onclick="iniciarProceso()" disabled>Procesar y guardar ciclo</button>
     </div>
 
     <div id="parse-status" style="margin-top:14px;font-size:12px;color:var(--gris)"></div>
@@ -302,7 +306,7 @@ input.comprar-input.tiene-valor{border-color:var(--teal);background:var(--teal-c
 <div class="toast" id="toast"></div>
 
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbzfjBhXIllAJyzYim57U_zHkbTh_b9NrJ3XULKBTd0Nw7UgpMNnTBh9fe6O50TyyQkg/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbzG5kT_5mL-8x5GoX0RwnhjrplXj6sJvdnYGmm4pGO6f62VL5w-jJQaqEB-7bDmYRz5/exec";
 
 let archivosRaw = { stock_sl: null, stock_vm: null, ventas_sl: null, ventas_vm: null };
 let productos = [];
@@ -374,10 +378,12 @@ function mostrarBannerVacio(){
 }
 function mostrarBannerCargado(){
   const fecha = new Date(cicloMeta.fecha_carga).toLocaleString('es-AR');
+  const periodoTxt = (cicloMeta.periodoInicio && cicloMeta.periodoFin)
+    ? `<span class="periodo-chip">${cicloMeta.periodoInicio} → ${cicloMeta.periodoFin}</span> ` : '';
   document.getElementById('banner-estado').innerHTML = `
     <div class="banner ok">
       <div class="b-icon">📅</div>
-      <div class="b-text"><b>Ciclo cargado el ${fecha}</b> · proyección de ventas a 7 días (archivo cubría ${cicloMeta.dias} días) · stock: ${etiquetaStockMode(cicloMeta.stockMode)}.</div>
+      <div class="b-text"><b>Ciclo cargado el ${fecha}</b><br>Ventas del período ${periodoTxt}· proyectado a 7 días (base: ${cicloMeta.dias} días) · stock: ${etiquetaStockMode(cicloMeta.stockMode)}.</div>
       <div class="b-actions"><button class="btn btn-white btn-sm" onclick="mostrarCargaManual()">↺ Cargar archivos nuevos</button></div>
     </div>`;
 }
@@ -412,6 +418,54 @@ function showToast(msg, isErr){
   setTimeout(()=>t.classList.remove('show'), 2800);
 }
 
+function renderPeriodoBanner(){
+  const cont = document.getElementById('periodo-banner');
+  const pSL = archivosRaw.ventas_sl && archivosRaw.ventas_sl.periodo;
+  const pVM = archivosRaw.ventas_vm && archivosRaw.ventas_vm.periodo;
+
+  if(!archivosRaw.ventas_sl && !archivosRaw.ventas_vm){ cont.innerHTML = ''; return; }
+
+  const faltaSL = archivosRaw.ventas_sl && !pSL;
+  const faltaVM = archivosRaw.ventas_vm && !pVM;
+
+  if(faltaSL || faltaVM){
+    const cuales = [faltaSL?'San Luis':null, faltaVM?'Villa Mercedes':null].filter(Boolean).join(' y ');
+    cont.innerHTML = `<div class="banner warn" style="margin-bottom:0;margin-top:14px">
+      <div class="b-icon">⚠️</div>
+      <div class="b-text">No pudimos detectar automáticamente el período de ventas en el archivo de <b>${cuales}</b>. Revisá que sea un export de Axum sin modificar, y confirmá manualmente el campo "Días cubiertos" antes de procesar.</div>
+    </div>`;
+    return;
+  }
+
+  if(pSL && pVM){
+    const coincide = pSL.inicioStr === pVM.inicioStr && pSL.finStr === pVM.finStr;
+    if(coincide){
+      cont.innerHTML = `<div class="banner ok" style="margin-bottom:0;margin-top:14px">
+        <div class="b-icon">📅</div>
+        <div class="b-text">Período de ventas detectado: <span class="periodo-chip">${pSL.inicioStr} → ${pSL.finStr}</span> · <b>${pSL.dias} días</b> — coincide en San Luis y Villa Mercedes.</div>
+      </div>`;
+      document.getElementById('cfg-dias').value = pSL.dias;
+    } else {
+      cont.innerHTML = `<div class="banner err" style="margin-bottom:0;margin-top:14px">
+        <div class="b-icon">🚨</div>
+        <div class="b-text"><b>Los archivos de ventas NO cubren el mismo período.</b><br>
+        San Luis: <span class="periodo-chip">${pSL.inicioStr} → ${pSL.finStr} · ${pSL.dias}d</span>
+        Villa Mercedes: <span class="periodo-chip">${pVM.inicioStr} → ${pVM.finStr} · ${pVM.dias}d</span><br>
+        Revisá los exports antes de continuar — comparar períodos distintos entre depósitos puede distorsionar las alertas de quiebre.</div>
+      </div>`;
+    }
+    return;
+  }
+
+  // solo uno de los dos cargado todavía
+  const p = pSL || pVM;
+  const cual = pSL ? 'San Luis' : 'Villa Mercedes';
+  cont.innerHTML = `<div class="banner warn" style="margin-bottom:0;margin-top:14px">
+    <div class="b-icon">📅</div>
+    <div class="b-text">Período detectado en <b>${cual}</b>: <span class="periodo-chip">${p.inicioStr} → ${p.finStr}</span> · ${p.dias} días. Falta subir el otro archivo de ventas para confirmar que coincida.</div>
+  </div>`;
+}
+
 function onFile(evt, key){
   const file = evt.target.files[0];
   if(!file) return;
@@ -422,10 +476,21 @@ function onFile(evt, key){
       const wb = XLSX.read(data, {type:'array', cellDates:false});
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:null});
-      archivosRaw[key] = { name: file.name, rows };
+      let periodo = null;
+      if(key === 'ventas_sl' || key === 'ventas_vm'){
+        periodo = detectarPeriodoVentas(rows);
+      }
+      archivosRaw[key] = { name: file.name, rows, periodo };
       document.getElementById('box-'+key).classList.add('filled');
-      document.getElementById('file-'+key).textContent = '✓ ' + file.name;
+      let fileHtml = '✓ ' + escHtml(file.name);
+      if(key === 'ventas_sl' || key === 'ventas_vm'){
+        fileHtml += periodo
+          ? `<br><span style="color:var(--azul)">${periodo.inicioStr} → ${periodo.finStr} · ${periodo.dias} días</span>`
+          : `<br><span style="color:var(--rojo)">⚠️ período no detectado</span>`;
+      }
+      document.getElementById('file-'+key).innerHTML = fileHtml;
       document.getElementById('btn-procesar').disabled = !(archivosRaw.stock_sl && archivosRaw.stock_vm && archivosRaw.ventas_sl && archivosRaw.ventas_vm);
+      if(key === 'ventas_sl' || key === 'ventas_vm') renderPeriodoBanner();
     }catch(err){
       alert('No se pudo leer el archivo "' + file.name + '". Verificá que sea un .xls/.xlsx válido.\n\n' + err.message);
     }
@@ -481,6 +546,32 @@ function parseStock(rows){
     }
   }
   return out;
+}
+
+function detectarPeriodoVentas(rows){
+  const re = /fecha\s+entre\s+(\d{1,2}\/\d{1,2}\/\d{4})\s+y\s+(\d{1,2}\/\d{1,2}\/\d{4})/i;
+  for(let i=0;i<Math.min(rows.length,10);i++){
+    const row = rows[i] || [];
+    for(const cell of row){
+      if(typeof cell === 'string'){
+        const m = cell.match(re);
+        if(m){
+          const parseDDMMYYYY = s => {
+            const [d,mo,y] = s.split('/').map(n=>parseInt(n,10));
+            return new Date(y, mo-1, d);
+          };
+          const inicio = parseDDMMYYYY(m[1]);
+          const fin = parseDDMMYYYY(m[2]);
+          const dias = Math.round((fin - inicio) / 86400000) + 1;
+          return { inicioStr: m[1], finStr: m[2], inicio, fin, dias };
+        }
+      }
+    }
+  }
+  return null;
+}
+function fmtFechaCorta(d){
+  return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
 }
 
 function detectarColCantVentas(rows){
@@ -580,7 +671,29 @@ function construirDataset(){
   });
 
   out.sort((a,b)=> a.proveedor.localeCompare(b.proveedor) || a.descripcion.localeCompare(b.descripcion));
-  return { productos: out, dias, stockMode: document.getElementById('cfg-stockcol').value };
+
+  const pSL = archivosRaw.ventas_sl && archivosRaw.ventas_sl.periodo;
+  const pVM = archivosRaw.ventas_vm && archivosRaw.ventas_vm.periodo;
+  const periodoRef = pSL || pVM;
+
+  return {
+    productos: out, dias, stockMode: document.getElementById('cfg-stockcol').value,
+    periodoInicio: periodoRef ? periodoRef.inicioStr : '',
+    periodoFin: periodoRef ? periodoRef.finStr : ''
+  };
+}
+
+function iniciarProceso(){
+  const pSL = archivosRaw.ventas_sl && archivosRaw.ventas_sl.periodo;
+  const pVM = archivosRaw.ventas_vm && archivosRaw.ventas_vm.periodo;
+  const dias = document.getElementById('cfg-dias').value;
+
+  if(!pSL || !pVM){
+    if(!confirm(`No pudimos detectar el período de ventas en uno de los dos archivos.\n\n¿Confirmás que el archivo realmente cubre ${dias} día(s), como está puesto en "Días cubiertos"?`)) return;
+  } else if(pSL.inicioStr !== pVM.inicioStr || pSL.finStr !== pVM.finStr){
+    if(!confirm(`Los archivos de ventas cubren períodos DISTINTOS:\n\nSan Luis: ${pSL.inicioStr} → ${pSL.finStr} (${pSL.dias} días)\nVilla Mercedes: ${pVM.inicioStr} → ${pVM.finStr} (${pVM.dias} días)\n\n¿Confirmás que querés continuar de todas formas?`)) return;
+  }
+  procesarYSubir(false);
 }
 
 function procesarYSubir(force){
@@ -596,7 +709,8 @@ function procesarYSubir(force){
   }
   document.getElementById('parse-status').innerHTML = `Procesados ${ds.productos.length} productos. Guardando en la base de datos…`;
 
-  apiPost({ action:'cargar', force: !!force, dias: ds.dias, stockMode: ds.stockMode, productos: ds.productos })
+  apiPost({ action:'cargar', force: !!force, dias: ds.dias, stockMode: ds.stockMode,
+            periodoInicio: ds.periodoInicio, periodoFin: ds.periodoFin, productos: ds.productos })
     .then(res=>{
       if(res.requiereConfirmacion){
         const fecha = new Date(res.fechaCargaActual).toLocaleString('es-AR');
@@ -615,6 +729,7 @@ function procesarYSubir(force){
           document.getElementById('box-'+k).classList.remove('filled');
           document.getElementById('file-'+k).textContent = '';
         });
+        document.getElementById('periodo-banner').innerHTML = '';
         btn.disabled = true; btn.textContent = 'Procesar y guardar ciclo';
         document.getElementById('parse-status').innerHTML = '';
         cargarEstadoDesdeBackend();
@@ -780,6 +895,7 @@ function exportarPedidos(items){
     ['Pedidos de Compra — Congelados Puntanos'],
     ['Generado: ' + new Date().toLocaleString('es-AR')],
     ['Ciclo cargado: ' + (cicloMeta ? new Date(cicloMeta.fecha_carga).toLocaleString('es-AR') : '')],
+    ['Período de ventas: ' + (cicloMeta && cicloMeta.periodoInicio ? `${cicloMeta.periodoInicio} → ${cicloMeta.periodoFin}` : `(no detectado — base ${cicloMeta?cicloMeta.dias:''} días)`)],
     [],
     ['Proveedor', 'Cantidad de productos', 'Unidades totales a pedir', 'Estimado $']
   ];
@@ -931,16 +1047,17 @@ function abrirHistorial(){
       return;
     }
     let html = `<table class="hist-tbl"><thead><tr>
-      <th>Carga</th><th>Días</th><th>Estado</th><th>Productos</th><th>Alertas</th>
+      <th>Carga</th><th>Período de ventas</th><th>Estado</th><th>Productos</th><th>Alertas</th>
       <th>Pedido generado</th><th>Ítems pedidos</th><th>Unidades</th><th>Estimado $</th>
     </tr></thead><tbody>`;
     hist.forEach(h=>{
       const fechaCarga = h.fecha_carga ? new Date(h.fecha_carga).toLocaleString('es-AR') : '—';
       const fechaPedido = h.fecha_pedido ? new Date(h.fecha_pedido).toLocaleString('es-AR') : '—';
       const estadoCls = h.estado==='Cerrado' ? 'cerrado' : 'en-proceso';
+      const periodo = (h.periodo_inicio && h.periodo_fin) ? `${h.periodo_inicio} → ${h.periodo_fin} (${h.dias_cubiertos}d)` : `${h.dias_cubiertos}d (sin detectar)`;
       html += `<tr>
         <td>${fechaCarga}</td>
-        <td>${h.dias_cubiertos}</td>
+        <td>${periodo}</td>
         <td><span class="estado-chip ${estadoCls}">${escHtml(h.estado)}</span></td>
         <td>${h.cantidad_productos}</td>
         <td>${h.cantidad_alertas}</td>
