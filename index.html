@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pedidos de Compra — Congelados Puntanos</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --azul:   #1A3E6E; --azul-m: #2B5FA0; --azul-c: #E6F1FB;
+  --teal:   #0F6E56; --teal-c: #E1F5EE;
+  --coral:  #993C1D; --coral-c:#FAECE7;
+  --amber:  #BA7517; --amber-c:#FAEEDA;
+  --purp:   #3C3489; --purp-c: #EEEDFE;
+  --gris:   #5F5E5A; --gris-c: #F5F5F3;
+  --rojo:   #B3261E; --rojo-c: #FCE8E6;
+  --borde:  #D3D1C7; --texto: #2C2C2A; --bg: #F1EFE8;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--texto);min-height:100vh;}
+
+.hdr{background:var(--azul);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.15);flex-wrap:wrap;gap:10px;}
+.hdr-left{display:flex;flex-direction:column;}
+.hdr-emp{font-family:'DM Mono',monospace;font-size:10px;color:#7BA7D4;letter-spacing:2px;text-transform:uppercase;}
+.hdr-tit{font-size:18px;font-weight:600;color:white;}
+.hdr-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.btn{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;padding:9px 16px;border-radius:8px;border:none;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
+.btn-white{background:white;color:var(--azul);}
+.btn-white:hover{background:#e8f0fb;}
+.btn-teal{background:var(--teal);color:white;}
+.btn-teal:hover{background:#0d5d48;}
+.btn-teal:disabled{background:#9bbfb2;cursor:not-allowed;}
+.btn-ghost{background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.25);}
+.btn-ghost:hover{background:rgba(255,255,255,0.2);}
+.btn-coral{background:var(--coral);color:white;}
+.btn-coral:hover{background:#7d3117;}
+.btn-sm{padding:6px 12px;font-size:12px;}
+
+.wrap{max-width:1560px;margin:0 auto;padding:24px;}
+
+.card{background:white;border:1px solid var(--borde);border-radius:12px;padding:20px 22px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,0.04);}
+.card-tit{font-size:14px;font-weight:600;color:var(--azul);margin-bottom:4px;display:flex;align-items:center;gap:8px;}
+.card-sub{font-size:12px;color:var(--gris);margin-bottom:16px;line-height:1.5;}
+
+.banner{display:flex;align-items:center;gap:14px;padding:16px 20px;border-radius:12px;margin-bottom:18px;flex-wrap:wrap;}
+.banner.ok{background:var(--teal-c);border:1px solid #9BD9C4;}
+.banner.warn{background:var(--amber-c);border:1px solid #EFC77C;}
+.banner .b-icon{font-size:22px;}
+.banner .b-text{flex:1;font-size:13px;color:var(--texto);}
+.banner .b-text b{color:var(--azul);}
+.banner .b-actions{display:flex;gap:8px;}
+
+.upload-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;}
+.upload-box{border:1.5px dashed var(--borde);border-radius:10px;padding:16px;text-align:center;transition:all .15s;position:relative;background:var(--gris-c);}
+.upload-box.filled{border-style:solid;border-color:var(--teal);background:var(--teal-c);}
+.upload-box .up-icon{font-size:22px;margin-bottom:6px;}
+.upload-box .up-label{font-size:12px;font-weight:600;color:var(--texto);margin-bottom:2px;}
+.upload-box .up-sub{font-size:10.5px;color:var(--gris);margin-bottom:10px;}
+.upload-box .up-file{font-family:'DM Mono',monospace;font-size:10.5px;color:var(--teal);word-break:break-all;margin-top:6px;}
+.upload-box input[type=file]{display:none;}
+.upload-box label.up-btn{display:inline-block;background:white;border:1px solid var(--borde);border-radius:6px;padding:6px 12px;font-size:11.5px;cursor:pointer;color:var(--azul-m);font-weight:500;}
+.upload-box label.up-btn:hover{background:var(--azul-c);}
+
+.cfg-row{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-end;margin-top:16px;padding-top:16px;border-top:1px solid var(--borde);}
+.cfg-field{display:flex;flex-direction:column;gap:4px;}
+.cfg-field label{font-size:10.5px;font-weight:600;color:var(--gris);text-transform:uppercase;letter-spacing:0.4px;}
+.cfg-field input, .cfg-field select{font-family:'DM Sans',sans-serif;font-size:13px;border:1.5px solid var(--borde);border-radius:7px;padding:7px 10px;width:110px;background:var(--gris-c);}
+.cfg-field input:focus, .cfg-field select:focus{outline:none;border-color:var(--azul-m);background:white;}
+.cfg-note{font-size:11px;color:var(--gris);max-width:320px;line-height:1.5;}
+
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px;}
+.kpi{background:white;border:1px solid var(--borde);border-radius:12px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,0.04);}
+.kpi-val{font-family:'DM Mono',monospace;font-size:22px;font-weight:500;color:var(--azul);}
+.kpi-lbl{font-size:11px;color:var(--gris);text-transform:uppercase;letter-spacing:0.4px;margin-top:2px;}
+.kpi.alerta .kpi-val{color:var(--rojo);}
+.kpi.dinero .kpi-val{color:var(--purp);}
+
+.filter-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
+.filter-bar input[type=text]{font-family:'DM Sans',sans-serif;font-size:13px;border:1.5px solid var(--borde);border-radius:7px;padding:8px 12px;background:var(--gris-c);min-width:220px;}
+.filter-bar select{font-family:'DM Sans',sans-serif;font-size:13px;border:1.5px solid var(--borde);border-radius:7px;padding:8px 12px;background:var(--gris-c);}
+.filter-bar input:focus, .filter-bar select:focus{outline:none;border-color:var(--azul-m);background:white;}
+.chk-lbl{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--texto);background:var(--gris-c);border:1.5px solid var(--borde);border-radius:7px;padding:7px 12px;cursor:pointer;}
+.chk-lbl input{width:15px;height:15px;cursor:pointer;}
+.spacer{flex:1;}
+.count-pill{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--gris);background:var(--gris-c);border-radius:20px;padding:6px 12px;}
+.save-pill{font-family:'DM Mono',monospace;font-size:11px;border-radius:20px;padding:6px 12px;transition:all .2s;}
+.save-pill.idle{color:var(--gris);background:var(--gris-c);}
+.save-pill.saving{color:var(--amber);background:var(--amber-c);}
+.save-pill.saved{color:var(--teal);background:var(--teal-c);}
+.save-pill.error{color:var(--rojo);background:var(--rojo-c);}
+
+.tbl-wrap{overflow-x:auto;border:1px solid var(--borde);border-radius:10px;}
+table{border-collapse:collapse;width:100%;font-size:12.5px;}
+thead th{position:sticky;top:0;background:var(--azul);color:white;font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.3px;padding:10px 10px;text-align:right;white-space:nowrap;z-index:5;}
+thead th.left{text-align:left;}
+thead tr.grp th{background:var(--azul-m);font-size:10px;padding:5px 10px;}
+tbody td{padding:8px 10px;border-bottom:1px solid #EFEDE6;text-align:right;white-space:nowrap;}
+tbody td.left{text-align:left;white-space:normal;max-width:280px;}
+tbody tr:hover{background:#FAFAF7;}
+tbody tr.alerta{background:var(--rojo-c);}
+tbody tr.alerta:hover{background:#f9d8d5;}
+tbody tr.sin-mov td{color:#B3B1A6;}
+.prov-tag{font-size:10px;font-weight:600;color:var(--gris);text-transform:uppercase;letter-spacing:0.3px;}
+.desc-txt{font-weight:500;}
+.cod-txt{font-family:'DM Mono',monospace;font-size:11px;color:var(--gris);}
+.neg{color:var(--rojo);font-weight:600;}
+.pos{color:var(--teal);}
+.badge-alerta{display:inline-block;background:var(--rojo);color:white;font-size:9px;font-weight:600;border-radius:4px;padding:2px 6px;margin-left:4px;letter-spacing:0.3px;}
+input.comprar-input{width:70px;font-family:'DM Mono',monospace;font-size:12.5px;text-align:right;border:1.5px solid var(--borde);border-radius:6px;padding:5px 7px;background:white;}
+input.comprar-input:focus{outline:none;border-color:var(--teal);background:var(--teal-c);}
+input.comprar-input.tiene-valor{border-color:var(--teal);background:var(--teal-c);font-weight:600;}
+.sug-txt{font-size:11px;color:var(--gris);font-family:'DM Mono',monospace;}
+.precio-txt{font-size:11px;color:var(--gris);font-family:'DM Mono',monospace;}
+.precio-txt.sinprecio{color:#C9C7BC;font-style:italic;}
+.estimado-txt{font-family:'DM Mono',monospace;color:var(--purp);}
+
+.empty-state{text-align:center;padding:40px 20px;color:var(--gris);}
+.empty-state .ico{font-size:32px;margin-bottom:10px;}
+
+.footer-bar{display:flex;justify-content:space-between;align-items:center;margin-top:16px;flex-wrap:wrap;gap:12px;}
+.legend{display:flex;gap:16px;font-size:11.5px;color:var(--gris);flex-wrap:wrap;}
+.legend .sw{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px;}
+
+.toast{position:fixed;bottom:24px;right:24px;background:var(--azul);color:white;padding:12px 18px;border-radius:8px;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,0.2);opacity:0;transform:translateY(10px);transition:all .25s;pointer-events:none;z-index:999;max-width:340px;}
+.toast.show{opacity:1;transform:translateY(0);}
+.toast.err{background:var(--rojo);}
+
+.hist-overlay{position:fixed;inset:0;background:rgba(20,20,18,0.4);display:none;align-items:flex-start;justify-content:center;z-index:200;padding:40px 20px;overflow-y:auto;}
+.hist-overlay.open{display:flex;}
+.hist-panel{background:white;border-radius:14px;max-width:1000px;width:100%;padding:24px;box-shadow:0 12px 40px rgba(0,0,0,0.25);}
+.hist-panel-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+.hist-panel-hdr h2{font-size:16px;color:var(--azul);}
+.hist-close{background:var(--gris-c);border:none;border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:16px;color:var(--gris);}
+.hist-close:hover{background:var(--borde);}
+.hist-tbl{width:100%;border-collapse:collapse;font-size:12px;}
+.hist-tbl th{background:var(--gris-c);text-align:left;padding:8px 10px;font-size:10.5px;text-transform:uppercase;color:var(--gris);letter-spacing:0.3px;}
+.hist-tbl td{padding:8px 10px;border-bottom:1px solid #EFEDE6;}
+.estado-chip{font-size:10px;font-weight:600;padding:3px 8px;border-radius:10px;text-transform:uppercase;}
+.estado-chip.en-proceso{background:var(--amber-c);color:var(--amber);}
+.estado-chip.cerrado{background:var(--teal-c);color:var(--teal);}
+
+.setup-warning{background:var(--rojo-c);border:1px solid #EFAAA4;border-radius:10px;padding:16px 20px;font-size:13px;color:var(--rojo);margin-bottom:18px;line-height:1.6;}
+.setup-warning code{background:white;padding:1px 6px;border-radius:4px;}
+
+.loader{display:flex;align-items:center;gap:10px;color:var(--gris);font-size:13px;padding:30px;justify-content:center;}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-left">
+    <span class="hdr-emp">Congelados Puntanos · Compras</span>
+    <span class="hdr-tit">Pedidos de Compra — Stock vs. Ventas</span>
+  </div>
+  <div class="hdr-right">
+    <button class="btn btn-ghost" onclick="abrirHistorial()">🕘 Historial de ciclos</button>
+    <button class="btn btn-teal" id="btn-exportar" onclick="confirmarGenerarYLimpiar()" disabled>⬇ Generar pedido y limpiar</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div id="setup-warning" class="setup-warning" style="display:none">
+    ⚠️ Falta configurar la conexión con el backend. Abrí el archivo HTML y reemplazá el valor de <code>API_URL</code> por la URL <code>/exec</code> de tu implementación de Apps Script (ver instrucciones en <code>Code.gs</code>).
+  </div>
+
+  <div id="loader-inicial" class="loader">⏳ Cargando estado del ciclo actual…</div>
+
+  <div id="banner-estado"></div>
+
+  <div class="card" id="card-precios">
+    <div class="card-tit">💲 Precios de compra</div>
+    <div class="card-sub">Se cargan por código en la hoja <b>"Precios"</b> del Google Sheet y alimentan la columna "Estimado $" del comparativo. Se pueden actualizar todas las veces que haga falta con la misma plantilla — solo se actualizan los códigos que traigan un precio cargado, el resto queda como estaba.</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <label class="btn btn-white btn-sm" style="cursor:pointer">📥 Importar plantilla de precios<input type="file" accept=".xlsx,.xls" style="display:none" onchange="onPreciosFile(event)"></label>
+      <button class="btn btn-ghost btn-sm" style="color:var(--azul);background:var(--azul-c);border:1px solid var(--azul-c)" onclick="descargarPlantillaPrecios()">📋 Descargar plantilla actualizada</button>
+      <span id="precios-status" style="font-size:12px;color:var(--gris)"></span>
+    </div>
+  </div>
+
+  <div class="card" id="card-carga" style="display:none">
+    <div class="card-tit">Cargar los 4 archivos</div>
+    <div class="card-sub">Subí los exports de Axum tal cual se descargan (.xls). Se procesan en tu navegador y se guardan en la base de datos compartida — el jefe de compras los va a ver apenas termine la carga.</div>
+    <div class="upload-grid">
+      <div class="upload-box" id="box-stock_sl">
+        <div class="up-icon">📦</div>
+        <div class="up-label">Stock San Luis</div>
+        <div class="up-sub">Reporte de stock — depósito San Luis</div>
+        <label class="up-btn">Elegir archivo<input type="file" accept=".xls,.xlsx" onchange="onFile(event,'stock_sl')"></label>
+        <div class="up-file" id="file-stock_sl"></div>
+      </div>
+      <div class="upload-box" id="box-stock_vm">
+        <div class="up-icon">📦</div>
+        <div class="up-label">Stock Villa Mercedes</div>
+        <div class="up-sub">Reporte de stock — depósito Villa Mercedes</div>
+        <label class="up-btn">Elegir archivo<input type="file" accept=".xls,.xlsx" onchange="onFile(event,'stock_vm')"></label>
+        <div class="up-file" id="file-stock_vm"></div>
+      </div>
+      <div class="upload-box" id="box-ventas_sl">
+        <div class="up-icon">🧾</div>
+        <div class="up-label">Ventas San Luis</div>
+        <div class="up-sub">Ventas por período — zona San Luis</div>
+        <label class="up-btn">Elegir archivo<input type="file" accept=".xls,.xlsx" onchange="onFile(event,'ventas_sl')"></label>
+        <div class="up-file" id="file-ventas_sl"></div>
+      </div>
+      <div class="upload-box" id="box-ventas_vm">
+        <div class="up-icon">🧾</div>
+        <div class="up-label">Ventas Villa Mercedes</div>
+        <div class="up-sub">Ventas por período — zona Villa Mercedes</div>
+        <label class="up-btn">Elegir archivo<input type="file" accept=".xls,.xlsx" onchange="onFile(event,'ventas_vm')"></label>
+        <div class="up-file" id="file-ventas_vm"></div>
+      </div>
+    </div>
+
+    <div class="cfg-row">
+      <div class="cfg-field">
+        <label>Días cubiertos (ventas)</label>
+        <input type="number" id="cfg-dias" value="7" min="1" max="60">
+      </div>
+      <div class="cfg-field">
+        <label>Stock a usar</label>
+        <select id="cfg-stockcol">
+          <option value="disponible" selected>Disponible p/venta</option>
+          <option value="total">Total (incl. camiones)</option>
+          <option value="deposito">Depósito (incl. reservado)</option>
+        </select>
+      </div>
+      <div class="cfg-note"><b>Días cubiertos:</b> el rango real que exportaste en los archivos de ventas. Si no son 7 días exactos, se proyecta a 7 días con un promedio diario.</div>
+      <div class="cfg-note"><b>Stock a usar:</b> por defecto "Disponible p/venta" (Depósito − Reservado), lo que hoy se puede vender.</div>
+      <div class="spacer"></div>
+      <button class="btn btn-teal btn-sm" id="btn-procesar" onclick="procesarYSubir()" disabled>Procesar y guardar ciclo</button>
+    </div>
+
+    <div id="parse-status" style="margin-top:14px;font-size:12px;color:var(--gris)"></div>
+  </div>
+
+  <div id="seccion-datos" style="display:none">
+
+    <div class="kpi-grid" id="kpi-grid"></div>
+
+    <div class="card">
+      <div class="card-tit">Comparativo Stock vs. Ventas</div>
+      <div class="card-sub">Cargá la cantidad a comprar de cada producto en <b>A comprar</b>. Se guarda sola en la base de datos a los pocos segundos de dejar de tipear (mirá el indicador junto al buscador). Filas en rojo: stock igual o menor a lo vendido.</div>
+
+      <div class="filter-bar">
+        <input type="text" id="f-buscar" placeholder="Buscar por código o descripción…" oninput="renderTabla()">
+        <select id="f-proveedor" onchange="renderTabla()"><option value="">Todos los proveedores</option></select>
+        <label class="chk-lbl"><input type="checkbox" id="f-alertas" onchange="renderTabla()"> Solo productos en alerta</label>
+        <label class="chk-lbl"><input type="checkbox" id="f-conventas" onchange="renderTabla()"> Ocultar sin movimiento</label>
+        <label class="chk-lbl"><input type="checkbox" id="f-solocompra" onchange="renderTabla()"> Solo con cantidad a comprar</label>
+        <div class="spacer"></div>
+        <span class="save-pill idle" id="save-pill">sin cambios</span>
+        <span class="count-pill" id="count-pill">0 productos</span>
+      </div>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr class="grp">
+              <th class="left" rowspan="2" style="background:var(--azul)">Proveedor / Producto</th>
+              <th colspan="3">Stock (u.)</th>
+              <th colspan="3">Ventas · proyectadas (u.)</th>
+              <th colspan="3">Diferencia (stock − ventas)</th>
+              <th rowspan="2">Precio unit.</th>
+              <th rowspan="2">Sugerido</th>
+              <th rowspan="2">A comprar</th>
+              <th rowspan="2">Estimado $</th>
+            </tr>
+            <tr>
+              <th>SL</th><th>VM</th><th>Total</th>
+              <th>SL</th><th>VM</th><th>Total</th>
+              <th>SL</th><th>VM</th><th>Total</th>
+            </tr>
+          </thead>
+          <tbody id="tbl-body"></tbody>
+        </table>
+      </div>
+
+      <div class="footer-bar">
+        <div class="legend">
+          <span><span class="sw" style="background:var(--rojo-c);border:1px solid var(--rojo)"></span>Stock ≤ ventas (alerta de quiebre)</span>
+          <span><span class="sw" style="background:var(--teal-c);border:1px solid var(--teal)"></span>Cantidad a comprar cargada</span>
+          <span>Precios: se cargan por código en la hoja <b>"Precios"</b> del Google Sheet.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="hist-overlay" id="hist-overlay">
+  <div class="hist-panel">
+    <div class="hist-panel-hdr">
+      <h2>🕘 Historial de ciclos de carga</h2>
+      <button class="hist-close" onclick="cerrarHistorial()">✕</button>
+    </div>
+    <div id="hist-content"><div class="loader">⏳ Cargando historial…</div></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycbzfjBhXIllAJyzYim57U_zHkbTh_b9NrJ3XULKBTd0Nw7UgpMNnTBh9fe6O50TyyQkg/exec";
+
+let archivosRaw = { stock_sl: null, stock_vm: null, ventas_sl: null, ventas_vm: null };
+let productos = [];
+let preciosMap = {};
+let preciosArr = [];
+let comprasManual = {};
+let cicloMeta = null;
+let providerRE = /\bS\.?\s?A\.?\b|\bSRL\b|\bS\.R\.L\.?\b|SOCIEDAD\s+AN[OÓ]NI/i;
+let saveTimer = null;
+
+window.addEventListener('DOMContentLoaded', () => {
+  if (!API_URL || API_URL.indexOf('PEGAR_AQUI') === 0) {
+    document.getElementById('setup-warning').style.display = 'block';
+    document.getElementById('loader-inicial').style.display = 'none';
+    return;
+  }
+  cargarEstadoDesdeBackend();
+});
+
+function apiGet(action){
+  return fetch(`${API_URL}?action=${action}`).then(r=>r.json());
+}
+function apiPost(payload){
+  return fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload)
+  }).then(r=>r.json());
+}
+
+function cargarEstadoDesdeBackend(){
+  document.getElementById('loader-inicial').style.display = 'flex';
+  apiGet('estado').then(data=>{
+    document.getElementById('loader-inicial').style.display = 'none';
+    preciosMap = {};
+    preciosArr = data.precios || [];
+    preciosArr.forEach(p => preciosMap[String(p.codigo).trim()] = Number(p.precio_unitario)||0);
+
+    if (data.cargado){
+      productos = data.productos || [];
+      cicloMeta = data.meta;
+      comprasManual = {};
+      productos.forEach(p=>{ if(Number(p.a_comprar)>0) comprasManual[p.codigo] = Number(p.a_comprar); });
+      mostrarBannerCargado();
+      poblarFiltroProveedor();
+      renderKPIs();
+      renderTabla();
+      document.getElementById('seccion-datos').style.display = 'block';
+      document.getElementById('card-carga').style.display = 'none';
+      document.getElementById('btn-exportar').disabled = false;
+    } else {
+      mostrarBannerVacio();
+      document.getElementById('seccion-datos').style.display = 'none';
+      document.getElementById('card-carga').style.display = 'block';
+      document.getElementById('btn-exportar').disabled = true;
+    }
+  }).catch(err=>{
+    document.getElementById('loader-inicial').style.display = 'none';
+    document.getElementById('banner-estado').innerHTML = `<div class="banner warn"><div class="b-icon">⚠️</div><div class="b-text">No se pudo conectar con el backend. Revisá la URL de <b>API_URL</b> y que el Apps Script esté desplegado como "Cualquier usuario". <br><span style="font-size:11px">${escHtml(String(err))}</span></div></div>`;
+  });
+}
+
+function mostrarBannerVacio(){
+  document.getElementById('banner-estado').innerHTML = `
+    <div class="banner warn">
+      <div class="b-icon">📭</div>
+      <div class="b-text"><b>No hay datos cargados.</b> Subí los 4 archivos abajo para iniciar un ciclo de pedido.</div>
+    </div>`;
+}
+function mostrarBannerCargado(){
+  const fecha = new Date(cicloMeta.fecha_carga).toLocaleString('es-AR');
+  document.getElementById('banner-estado').innerHTML = `
+    <div class="banner ok">
+      <div class="b-icon">📅</div>
+      <div class="b-text"><b>Ciclo cargado el ${fecha}</b> · proyección de ventas a 7 días (archivo cubría ${cicloMeta.dias} días) · stock: ${etiquetaStockMode(cicloMeta.stockMode)}.</div>
+      <div class="b-actions"><button class="btn btn-white btn-sm" onclick="mostrarCargaManual()">↺ Cargar archivos nuevos</button></div>
+    </div>`;
+}
+function etiquetaStockMode(m){
+  return m==='total' ? 'Total (incl. camiones)' : m==='deposito' ? 'Depósito (incl. reservado)' : 'Disponible p/venta';
+}
+function mostrarCargaManual(){
+  document.getElementById('card-carga').style.display = 'block';
+  document.getElementById('card-carga').scrollIntoView({behavior:'smooth'});
+}
+
+function isBlank(v){ return v===null || v===undefined || v==='' || (typeof v==='number' && isNaN(v)); }
+function toNum(v){ if(isBlank(v)) return 0; const n = typeof v==='number' ? v : parseFloat(String(v).replace(',','.')); return isNaN(n)?0:n; }
+function isProviderText(s){
+  const letters = s.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ]/g,'');
+  if(!letters) return false;
+  if(letters !== letters.toUpperCase()) return false;
+  return providerRE.test(s);
+}
+function countNonBlank(row){
+  let idx = [];
+  row.forEach((v,i)=>{ if(!isBlank(v)) idx.push(i); });
+  return idx;
+}
+function escHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmt(n){ return (Math.round(n*100)/100).toLocaleString('es-AR',{maximumFractionDigits:2}); }
+function fmtMoney(n){ return n.toLocaleString('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}); }
+function showToast(msg, isErr){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isErr?' err':'');
+  setTimeout(()=>t.classList.remove('show'), 2800);
+}
+
+function onFile(evt, key){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, {type:'array', cellDates:false});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:null});
+      archivosRaw[key] = { name: file.name, rows };
+      document.getElementById('box-'+key).classList.add('filled');
+      document.getElementById('file-'+key).textContent = '✓ ' + file.name;
+      document.getElementById('btn-procesar').disabled = !(archivosRaw.stock_sl && archivosRaw.stock_vm && archivosRaw.ventas_sl && archivosRaw.ventas_vm);
+    }catch(err){
+      alert('No se pudo leer el archivo "' + file.name + '". Verificá que sea un .xls/.xlsx válido.\n\n' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function detectarFormatoStock(rows){
+  let tieneCodProv = false;
+  for(let i=0;i<Math.min(rows.length,15);i++){
+    const row = rows[i] || [];
+    for(const cell of row){
+      if(typeof cell === 'string' && /c[oó]d\.?\s*prov/i.test(cell)){ tieneCodProv = true; break; }
+    }
+    if(tieneCodProv) break;
+  }
+  return tieneCodProv
+    ? { descIdx: 2, dispBIdx: 12, dispUIdx: 13, totBIdx: 4, totUIdx: 5, depBIdx: 8, depUIdx: 9 }
+    : { descIdx: 1, dispBIdx: 13, dispUIdx: 14, totBIdx: 5, totUIdx: 6, depBIdx: 9, depUIdx: 10 };
+}
+
+function parseStock(rows){
+  const fmt = detectarFormatoStock(rows);
+  const stockMode = document.getElementById('cfg-stockcol').value;
+  const out = [];
+  let proveedorActual = null;
+
+  for(const rawRow of rows){
+    const row = rawRow || [];
+    const code = row[0];
+    const desc = row[fmt.descIdx];
+    const col3 = row[3];
+
+    if(typeof col3 === 'string' && /sub\s*total/i.test(col3)) continue;
+
+    const nonBlank = countNonBlank(row);
+    if(nonBlank.length === 1 && nonBlank[0] === 0 && typeof row[0] === 'string'){
+      const txt = row[0].trim();
+      if(isProviderText(txt)) proveedorActual = txt;
+      continue;
+    }
+
+    if(!isBlank(code) && !isBlank(desc)){
+      const codeStr = String(code).trim();
+      if(codeStr === 'Cód.' || codeStr === 'Cód. Prov') continue;
+
+      let valor;
+      if(stockMode === 'disponible') valor = toNum(row[fmt.dispBIdx]) + toNum(row[fmt.dispUIdx]);
+      else if(stockMode === 'deposito') valor = toNum(row[fmt.depBIdx]) + toNum(row[fmt.depUIdx]);
+      else valor = toNum(row[fmt.totBIdx]) + toNum(row[fmt.totUIdx]);
+
+      out.push({ codigo: codeStr, descripcion: String(desc).trim(), proveedor: proveedorActual, stock: valor });
+    }
+  }
+  return out;
+}
+
+function detectarColCantVentas(rows){
+  for(let i=0;i<Math.min(rows.length,12);i++){
+    const row = rows[i] || [];
+    const idx = row.findIndex(c => typeof c === 'string' && /^cant\.?$/i.test(c.trim()));
+    if(idx >= 0) return idx + 1;
+  }
+  return 7;
+}
+
+function parseVentas(rows){
+  const cantIdx = detectarColCantVentas(rows);
+  const out = [];
+  let proveedorActual = null;
+
+  for(const rawRow of rows){
+    const row = rawRow || [];
+    const codProv = row[0];
+    const codInt = row[1];
+    const desc = row[2];
+    const cant = row[cantIdx];
+
+    if(typeof codProv === 'string' && /total\s*general/i.test(codProv)) continue;
+    if(typeof codProv === 'string' && codProv.trim() === 'Cod.Prov.') continue;
+
+    const nonBlank = countNonBlank(row);
+    if(nonBlank.length === 1 && nonBlank[0] === 0 && typeof row[0] === 'string' && isBlank(codInt) && isBlank(desc)){
+      const txt = row[0].trim();
+      if(isProviderText(txt)) proveedorActual = txt;
+      continue;
+    }
+
+    const code = !isBlank(codInt) ? codInt : codProv;
+    if(!isBlank(code) && !isBlank(desc) && String(desc).trim() !== 'Descripcion'){
+      out.push({ codigo: String(code).trim(), descripcion: String(desc).trim(), proveedor: proveedorActual, ventas: toNum(cant) });
+    }
+  }
+  return out;
+}
+
+function construirDataset(){
+  const stockSL = parseStock(archivosRaw.stock_sl.rows);
+  const stockVM = parseStock(archivosRaw.stock_vm.rows);
+  const ventasSL = parseVentas(archivosRaw.ventas_sl.rows);
+  const ventasVM = parseVentas(archivosRaw.ventas_vm.rows);
+
+  const dias = parseFloat(document.getElementById('cfg-dias').value) || 7;
+  const factorProy = 7 / dias;
+
+  const stockSLMap = {}; stockSL.forEach(p=>stockSLMap[p.codigo]=p);
+  const stockVMMap = {}; stockVM.forEach(p=>stockVMMap[p.codigo]=p);
+  const ventasSLMap = {}; const ventasSLProv = {};
+  ventasSL.forEach(p=>{ ventasSLMap[p.codigo] = (ventasSLMap[p.codigo]||0) + p.ventas; ventasSLProv[p.codigo]=p.proveedor; });
+  const ventasVMMap = {}; const ventasVMProv = {};
+  ventasVM.forEach(p=>{ ventasVMMap[p.codigo] = (ventasVMMap[p.codigo]||0) + p.ventas; ventasVMProv[p.codigo]=p.proveedor; });
+
+  const todosCodigos = new Set([
+    ...Object.keys(stockSLMap), ...Object.keys(stockVMMap),
+    ...Object.keys(ventasSLMap), ...Object.keys(ventasVMMap)
+  ]);
+
+  const out = [];
+  todosCodigos.forEach(codigo=>{
+    const sSL = stockSLMap[codigo]; const sVM = stockVMMap[codigo];
+    const stockSLv = sSL ? sSL.stock : 0;
+    const stockVMv = sVM ? sVM.stock : 0;
+    const ventasSLraw = ventasSLMap[codigo] || 0;
+    const ventasVMraw = ventasVMMap[codigo] || 0;
+    const ventasSLv = ventasSLraw * factorProy;
+    const ventasVMv = ventasVMraw * factorProy;
+
+    const descripcion = (sSL && sSL.descripcion) || (sVM && sVM.descripcion) ||
+                         (ventasSL.find(p=>p.codigo===codigo)||{}).descripcion ||
+                         (ventasVM.find(p=>p.codigo===codigo)||{}).descripcion || '(sin descripción)';
+    const proveedor = (sSL && sSL.proveedor) || (sVM && sVM.proveedor) || ventasSLProv[codigo] || ventasVMProv[codigo] || 'Sin proveedor asignado';
+
+    const stockTotal = stockSLv + stockVMv;
+    const ventasTotal = ventasSLv + ventasVMv;
+    const diffSL = stockSLv - ventasSLv;
+    const diffVM = stockVMv - ventasVMv;
+    const diffTotal = stockTotal - ventasTotal;
+
+    const alerta = (ventasSLraw > 0 && stockSLv <= ventasSLv) ||
+                   (ventasVMraw > 0 && stockVMv <= ventasVMv) ||
+                   ((ventasSLraw+ventasVMraw) > 0 && stockTotal <= ventasTotal);
+
+    const sugerido = Math.max(0, Math.ceil(ventasTotal - stockTotal));
+
+    out.push({
+      codigo, descripcion, proveedor,
+      stock_sl: stockSLv, stock_vm: stockVMv, stock_total: stockTotal,
+      ventas_sl: ventasSLv, ventas_vm: ventasVMv, ventas_total: ventasTotal,
+      diff_sl: diffSL, diff_vm: diffVM, diff_total: diffTotal,
+      alerta, sugerido, a_comprar: 0
+    });
+  });
+
+  out.sort((a,b)=> a.proveedor.localeCompare(b.proveedor) || a.descripcion.localeCompare(b.descripcion));
+  return { productos: out, dias, stockMode: document.getElementById('cfg-stockcol').value };
+}
+
+function procesarYSubir(force){
+  const btn = document.getElementById('btn-procesar');
+  btn.disabled = true; btn.textContent = 'Procesando…';
+  let ds;
+  try {
+    ds = construirDataset();
+  } catch(err) {
+    alert('Error al procesar los archivos: ' + err.message);
+    btn.disabled = false; btn.textContent = 'Procesar y guardar ciclo';
+    return;
+  }
+  document.getElementById('parse-status').innerHTML = `Procesados ${ds.productos.length} productos. Guardando en la base de datos…`;
+
+  apiPost({ action:'cargar', force: !!force, dias: ds.dias, stockMode: ds.stockMode, productos: ds.productos })
+    .then(res=>{
+      if(res.requiereConfirmacion){
+        const fecha = new Date(res.fechaCargaActual).toLocaleString('es-AR');
+        if(confirm(`Ya hay un ciclo cargado desde el ${fecha} (puede tener cantidades ya cargadas por el jefe de compras).\n\n¿Confirmás que querés reemplazarlo?`)){
+          procesarYSubir(true);
+        } else {
+          btn.disabled = false; btn.textContent = 'Procesar y guardar ciclo';
+          document.getElementById('parse-status').innerHTML = 'Carga cancelada.';
+        }
+        return;
+      }
+      if(res.ok){
+        showToast('Ciclo guardado correctamente ✓');
+        archivosRaw = { stock_sl: null, stock_vm: null, ventas_sl: null, ventas_vm: null };
+        ['stock_sl','stock_vm','ventas_sl','ventas_vm'].forEach(k=>{
+          document.getElementById('box-'+k).classList.remove('filled');
+          document.getElementById('file-'+k).textContent = '';
+        });
+        btn.disabled = true; btn.textContent = 'Procesar y guardar ciclo';
+        document.getElementById('parse-status').innerHTML = '';
+        cargarEstadoDesdeBackend();
+      } else {
+        alert('No se pudo guardar el ciclo: ' + (res.error||'error desconocido'));
+        btn.disabled = false; btn.textContent = 'Procesar y guardar ciclo';
+      }
+    })
+    .catch(err=>{
+      alert('Error de conexión al guardar: ' + err);
+      btn.disabled = false; btn.textContent = 'Procesar y guardar ciclo';
+    });
+}
+
+function renderKPIs(){
+  const total = productos.length;
+  const alertas = productos.filter(p=>p.alerta).length;
+  const proveedores = new Set(productos.map(p=>p.proveedor)).size;
+  const cargados = Object.values(comprasManual).filter(v=>toNum(v)>0).length;
+  let estimado = 0, sinPrecio = 0;
+  productos.forEach(p=>{
+    const cant = comprasManual[p.codigo]||0;
+    if(cant>0){
+      const precio = preciosMap[p.codigo];
+      if(precio) estimado += cant*precio; else sinPrecio++;
+    }
+  });
+  const grid = document.getElementById('kpi-grid');
+  grid.innerHTML = `
+    <div class="kpi"><div class="kpi-val">${total}</div><div class="kpi-lbl">Productos</div></div>
+    <div class="kpi alerta"><div class="kpi-val">${alertas}</div><div class="kpi-lbl">En alerta de quiebre</div></div>
+    <div class="kpi"><div class="kpi-val">${proveedores}</div><div class="kpi-lbl">Proveedores</div></div>
+    <div class="kpi"><div class="kpi-val">${cargados}</div><div class="kpi-lbl">Con cantidad a comprar</div></div>
+    <div class="kpi dinero"><div class="kpi-val">${estimado>0?fmtMoney(estimado):'—'}</div><div class="kpi-lbl">Estimado del pedido${sinPrecio>0?` (${sinPrecio} sin precio)`:''}</div></div>
+  `;
+}
+
+function poblarFiltroProveedor(){
+  const sel = document.getElementById('f-proveedor');
+  const provs = [...new Set(productos.map(p=>p.proveedor))].sort();
+  sel.innerHTML = '<option value="">Todos los proveedores</option>' + provs.map(p=>`<option value="${escHtml(p)}">${escHtml(p)}</option>`).join('');
+}
+
+function renderTabla(){
+  const buscar = document.getElementById('f-buscar').value.trim().toLowerCase();
+  const provFiltro = document.getElementById('f-proveedor').value;
+  const soloAlertas = document.getElementById('f-alertas').checked;
+  const ocultarSinMov = document.getElementById('f-conventas').checked;
+  const soloConCompra = document.getElementById('f-solocompra').checked;
+
+  const filtrados = productos.filter(p=>{
+    if(buscar && !(String(p.codigo).toLowerCase().includes(buscar) || String(p.descripcion).toLowerCase().includes(buscar))) return false;
+    if(provFiltro && p.proveedor !== provFiltro) return false;
+    if(soloAlertas && !p.alerta) return false;
+    if(ocultarSinMov && toNum(p.stock_total)===0 && toNum(p.ventas_total)===0) return false;
+    if(soloConCompra && toNum(comprasManual[p.codigo]) <= 0) return false;
+    return true;
+  });
+
+  document.getElementById('count-pill').textContent = filtrados.length + ' productos';
+
+  const body = document.getElementById('tbl-body');
+  if(filtrados.length===0){
+    body.innerHTML = `<tr><td colspan="14"><div class="empty-state"><div class="ico">🔍</div>No hay productos que coincidan con los filtros.</div></td></tr>`;
+    return;
+  }
+
+  let html = '';
+  let provAnterior = null;
+  filtrados.forEach(p=>{
+    const cls = p.alerta ? 'alerta' : (toNum(p.stock_total)===0 && toNum(p.ventas_total)===0 ? 'sin-mov' : '');
+    const valCompra = comprasManual[p.codigo] !== undefined ? comprasManual[p.codigo] : '';
+    const tieneValor = toNum(valCompra) > 0;
+    const precio = preciosMap[p.codigo];
+    const estimado = precio ? precio * toNum(valCompra) : null;
+
+    html += `<tr class="${cls}">
+      <td class="left">
+        ${p.proveedor !== provAnterior ? `<div class="prov-tag">${escHtml(p.proveedor)}</div>` : ''}
+        <div class="desc-txt">${escHtml(p.descripcion)}${p.alerta?'<span class="badge-alerta">ALERTA</span>':''}</div>
+        <div class="cod-txt">${escHtml(p.codigo)}</div>
+      </td>
+      <td>${fmt(p.stock_sl)}</td><td>${fmt(p.stock_vm)}</td><td><b>${fmt(p.stock_total)}</b></td>
+      <td>${fmt(p.ventas_sl)}</td><td>${fmt(p.ventas_vm)}</td><td><b>${fmt(p.ventas_total)}</b></td>
+      <td class="${p.diff_sl<0?'neg':'pos'}">${fmt(p.diff_sl)}</td>
+      <td class="${p.diff_vm<0?'neg':'pos'}">${fmt(p.diff_vm)}</td>
+      <td class="${p.diff_total<0?'neg':'pos'}"><b>${fmt(p.diff_total)}</b></td>
+      <td class="precio-txt ${precio?'':'sinprecio'}">${precio?fmtMoney(precio):'sin precio'}</td>
+      <td class="sug-txt">${p.sugerido>0?fmt(p.sugerido):'—'}</td>
+      <td><input type="number" min="0" step="1" class="comprar-input ${tieneValor?'tiene-valor':''}"
+             value="${valCompra}" placeholder="0"
+             onchange="setCompra('${String(p.codigo).replace(/'/g,"\\'")}', this.value, this)"></td>
+      <td class="estimado-txt">${estimado!==null && estimado>0 ? fmtMoney(estimado) : '—'}</td>
+    </tr>`;
+    provAnterior = p.proveedor;
+  });
+  body.innerHTML = html;
+}
+
+function setCompra(codigo, valor, el){
+  const n = toNum(valor);
+  if(n > 0){ comprasManual[codigo] = n; el.classList.add('tiene-valor'); }
+  else { delete comprasManual[codigo]; el.classList.remove('tiene-valor'); }
+  const prod = productos.find(p=>p.codigo===codigo);
+  if(prod) prod.a_comprar = n;
+  renderKPIs();
+  renderTabla();
+  programarGuardado();
+}
+
+function programarGuardado(){
+  const pill = document.getElementById('save-pill');
+  pill.className = 'save-pill saving'; pill.textContent = 'guardando…';
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(guardarComprasEnBackend, 1200);
+}
+function guardarComprasEnBackend(){
+  const pill = document.getElementById('save-pill');
+  apiPost({ action:'guardarCompras', compras: comprasManual })
+    .then(res=>{
+      if(res.ok){ pill.className='save-pill saved'; pill.textContent='guardado ✓ ' + new Date(res.guardado).toLocaleTimeString('es-AR'); }
+      else { pill.className='save-pill error'; pill.textContent='error al guardar'; }
+    })
+    .catch(()=>{ pill.className='save-pill error'; pill.textContent='error de conexión'; });
+}
+
+function confirmarGenerarYLimpiar(){
+  const items = productos.filter(p => toNum(comprasManual[p.codigo]) > 0);
+  if(items.length === 0){
+    alert('No hay cantidades cargadas en "A comprar". Completá al menos un producto antes de generar el pedido.');
+    return;
+  }
+  if(!confirm(`Se va a generar el Excel de pedidos con ${items.length} producto(s) y luego se va a LIMPIAR el ciclo actual para que la administrativa pueda cargar los archivos del próximo pedido.\n\n¿Confirmás?`)) return;
+
+  clearTimeout(saveTimer);
+  guardarComprasEnBackend();
+
+  exportarPedidos(items);
+
+  apiPost({ action:'limpiar' }).then(res=>{
+    if(res.ok){
+      showToast('Pedido generado y ciclo limpiado ✓');
+      productos = []; comprasManual = {};
+      cargarEstadoDesdeBackend();
+    } else {
+      showToast('El Excel se generó, pero no se pudo limpiar el ciclo: ' + (res.error||''), true);
+    }
+  }).catch(err=>{
+    showToast('El Excel se generó, pero hubo un error de conexión al limpiar el ciclo.', true);
+  });
+}
+
+function exportarPedidos(items){
+  const porProveedor = {};
+  items.forEach(p=>{
+    if(!porProveedor[p.proveedor]) porProveedor[p.proveedor] = [];
+    porProveedor[p.proveedor].push(p);
+  });
+
+  const wb = XLSX.utils.book_new();
+
+  const resumenAOA = [
+    ['Pedidos de Compra — Congelados Puntanos'],
+    ['Generado: ' + new Date().toLocaleString('es-AR')],
+    ['Ciclo cargado: ' + (cicloMeta ? new Date(cicloMeta.fecha_carga).toLocaleString('es-AR') : '')],
+    [],
+    ['Proveedor', 'Cantidad de productos', 'Unidades totales a pedir', 'Estimado $']
+  ];
+  let granTotalUnid = 0, granTotalMoney = 0;
+  Object.keys(porProveedor).sort().forEach(prov=>{
+    const arr = porProveedor[prov];
+    const totalUnid = arr.reduce((s,p)=>s+toNum(comprasManual[p.codigo]),0);
+    const totalMoney = arr.reduce((s,p)=>{ const pr=preciosMap[p.codigo]; return s + (pr? pr*toNum(comprasManual[p.codigo]) : 0); },0);
+    granTotalUnid += totalUnid; granTotalMoney += totalMoney;
+    resumenAOA.push([prov, arr.length, totalUnid, totalMoney||'']);
+  });
+  resumenAOA.push([]);
+  resumenAOA.push(['TOTAL', items.length, granTotalUnid, granTotalMoney||'']);
+  const wsResumen = XLSX.utils.aoa_to_sheet(resumenAOA);
+  wsResumen['!cols'] = [{wch:38},{wch:22},{wch:22},{wch:16}];
+  XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen');
+
+  Object.keys(porProveedor).sort().forEach(prov=>{
+    const arr = porProveedor[prov];
+    const aoa = [
+      ['Pedido de Compra — ' + prov],
+      ['Generado: ' + new Date().toLocaleString('es-AR')],
+      [],
+      ['Código', 'Descripción', 'Stock SL', 'Stock VM', 'Stock Total', 'Ventas Total (proy.)', 'Precio unit.', 'Cantidad a Comprar', 'Estimado $']
+    ];
+    arr.sort((a,b)=>a.descripcion.localeCompare(b.descripcion));
+    arr.forEach(p=>{
+      const cant = toNum(comprasManual[p.codigo]);
+      const precio = preciosMap[p.codigo] || '';
+      aoa.push([p.codigo, p.descripcion, Math.round(p.stock_sl*100)/100, Math.round(p.stock_vm*100)/100,
+                Math.round(p.stock_total*100)/100, Math.round(p.ventas_total*100)/100, precio, cant, precio?precio*cant:'']);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{wch:12},{wch:42},{wch:10},{wch:10},{wch:12},{wch:16},{wch:12},{wch:14},{wch:14}];
+    let sheetName = prov.replace(/[\\\/\?\*\[\]:]/g,'').substring(0,31) || 'Proveedor';
+    let base = sheetName, i2 = 1;
+    while(wb.SheetNames.includes(sheetName)){ sheetName = (base.substring(0,28) + '_' + (++i2)); }
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  });
+
+  const fecha = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `Pedidos_Compra_CongeladosPuntanos_${fecha}.xlsx`);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// PRECIOS — importar plantilla / descargar plantilla actualizada
+// ══════════════════════════════════════════════════════════════════
+function normalizarHeader(h){
+  return String(h||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+}
+function onPreciosFile(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const status = document.getElementById('precios-status');
+  status.textContent = 'Leyendo archivo…';
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, {type:'array', cellDates:false});
+      const nombreHoja = wb.SheetNames.includes('Precios') ? 'Precios' : wb.SheetNames[0];
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[nombreHoja], {header:1, raw:true, defval:null});
+      if(!rows.length){ status.textContent = 'El archivo está vacío.'; return; }
+
+      const header = rows[0].map(normalizarHeader);
+      const idxCodigo = header.findIndex(h => h.includes('codigo'));
+      const idxDesc = header.findIndex(h => h.includes('descripcion'));
+      const idxProv = header.findIndex(h => h.includes('proveedor'));
+      const idxPrecio = header.findIndex(h => h.includes('precio'));
+
+      if(idxCodigo < 0 || idxPrecio < 0){
+        status.textContent = '⚠️ No se encontraron las columnas "Código" y "Precio unitario" en la primera fila.';
+        return;
+      }
+
+      const items = [];
+      for(let i=1;i<rows.length;i++){
+        const row = rows[i] || [];
+        const codigo = row[idxCodigo];
+        const precio = row[idxPrecio];
+        if(isBlank(codigo) || isBlank(precio)) continue;
+        const n = toNum(precio);
+        if(isNaN(n) || n < 0) continue;
+        items.push({
+          codigo: String(codigo).trim(),
+          descripcion: idxDesc>=0 ? row[idxDesc] : '',
+          proveedor: idxProv>=0 ? row[idxProv] : '',
+          precio_unitario: n
+        });
+      }
+
+      if(!items.length){ status.textContent = 'No se encontraron filas con código y precio cargados.'; return; }
+
+      status.textContent = `Subiendo ${items.length} precio(s)…`;
+      apiPost({ action:'cargarPrecios', precios: items }).then(res=>{
+        if(res.ok){
+          status.textContent = `✓ ${res.actualizados} actualizado(s), ${res.nuevos} nuevo(s).`;
+          showToast('Precios actualizados ✓');
+          if(productos.length){ cargarEstadoDesdeBackend(); } // refresca preciosMap y recalcula estimados
+        } else {
+          status.textContent = '⚠️ ' + (res.error || 'No se pudo actualizar');
+        }
+      }).catch(err=>{
+        status.textContent = '⚠️ Error de conexión al subir precios.';
+      });
+    } catch(err){
+      status.textContent = '⚠️ No se pudo leer el archivo: ' + err.message;
+    }
+    evt.target.value = '';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function descargarPlantillaPrecios(){
+  // Base: lo que ya está en la hoja Precios (con su precio actual, si lo tiene)
+  const base = {};
+  preciosArr.forEach(p => base[String(p.codigo).trim()] = {
+    codigo: p.codigo, descripcion: p.descripcion, proveedor: p.proveedor, precio_unitario: p.precio_unitario
+  });
+  // Suma cualquier producto del ciclo actual que todavía no tenga precio cargado
+  productos.forEach(p=>{
+    if(!base[p.codigo]) base[p.codigo] = { codigo: p.codigo, descripcion: p.descripcion, proveedor: p.proveedor, precio_unitario: '' };
+  });
+
+  const lista = Object.values(base);
+  if(!lista.length){
+    alert('Todavía no hay productos ni precios cargados. Usá primero la plantilla inicial o cargá un ciclo de stock/ventas.');
+    return;
+  }
+  lista.sort((a,b)=> String(a.proveedor).localeCompare(String(b.proveedor)) || String(a.descripcion).localeCompare(String(b.descripcion)));
+
+  const aoa = [['Código','Descripción','Proveedor','Precio unitario','Actualizado']];
+  lista.forEach(p => aoa.push([p.codigo, p.descripcion, p.proveedor, p.precio_unitario || '', '']));
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:12},{wch:46},{wch:30},{wch:16},{wch:14}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Precios');
+  XLSX.writeFile(wb, `Plantilla_Precios_CongeladosPuntanos_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+function abrirHistorial(){
+  document.getElementById('hist-overlay').classList.add('open');
+  document.getElementById('hist-content').innerHTML = '<div class="loader">⏳ Cargando historial…</div>';
+  apiGet('historial').then(data=>{
+    const hist = data.historial || [];
+    if(hist.length===0){
+      document.getElementById('hist-content').innerHTML = '<div class="empty-state"><div class="ico">🕘</div>Todavía no hay ciclos registrados.</div>';
+      return;
+    }
+    let html = `<table class="hist-tbl"><thead><tr>
+      <th>Carga</th><th>Días</th><th>Estado</th><th>Productos</th><th>Alertas</th>
+      <th>Pedido generado</th><th>Ítems pedidos</th><th>Unidades</th><th>Estimado $</th>
+    </tr></thead><tbody>`;
+    hist.forEach(h=>{
+      const fechaCarga = h.fecha_carga ? new Date(h.fecha_carga).toLocaleString('es-AR') : '—';
+      const fechaPedido = h.fecha_pedido ? new Date(h.fecha_pedido).toLocaleString('es-AR') : '—';
+      const estadoCls = h.estado==='Cerrado' ? 'cerrado' : 'en-proceso';
+      html += `<tr>
+        <td>${fechaCarga}</td>
+        <td>${h.dias_cubiertos}</td>
+        <td><span class="estado-chip ${estadoCls}">${escHtml(h.estado)}</span></td>
+        <td>${h.cantidad_productos}</td>
+        <td>${h.cantidad_alertas}</td>
+        <td>${fechaPedido}</td>
+        <td>${h.items_pedido||'—'}</td>
+        <td>${h.unidades_pedido?fmt(h.unidades_pedido):'—'}</td>
+        <td>${h.valorizado_estimado?fmtMoney(h.valorizado_estimado):'—'}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    document.getElementById('hist-content').innerHTML = html;
+  }).catch(err=>{
+    document.getElementById('hist-content').innerHTML = `<div class="empty-state">⚠️ No se pudo cargar el historial.<br><span style="font-size:11px">${escHtml(String(err))}</span></div>`;
+  });
+}
+function cerrarHistorial(){ document.getElementById('hist-overlay').classList.remove('open'); }
+</script>
+</body>
+</html>
