@@ -164,7 +164,7 @@ input.comprar-input.tiene-valor{border-color:var(--teal);background:var(--teal-c
 <div class="wrap">
 
   <div id="setup-warning" class="setup-warning" style="display:none">
-    ⚠️ Falta configurar la conexión con el backend. Abrí el archivo HTML y reemplazá el valor de <code>API_URL</code> por la URL <code>/exec</code> de tu implementación de Apps Script (ver instrucciones en <code>Code.gs</code>).
+    ⚠️ Falta configurar la conexión con el backend.
   </div>
 
   <div id="loader-inicial" class="loader">⏳ Cargando estado del ciclo actual…</div>
@@ -173,7 +173,7 @@ input.comprar-input.tiene-valor{border-color:var(--teal);background:var(--teal-c
 
   <div class="card" id="card-precios">
     <div class="card-tit">💲 Precios de compra</div>
-    <div class="card-sub">Se cargan por código en la hoja <b>"Precios"</b> del Google Sheet y alimentan la columna "Estimado $" del comparativo. Se pueden actualizar todas las veces que haga falta con la misma plantilla — solo se actualizan los códigos que traigan un precio cargado, el resto queda como estaba.</div>
+    <div class="card-sub">Se cargan por código en la hoja <b>"Precios"</b> del Google Sheet y alimentan la columna "Estimado $" del comparativo.</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
       <label class="btn btn-white btn-sm" style="cursor:pointer">📥 Importar plantilla de precios<input type="file" accept=".xlsx,.xls" style="display:none" onchange="onPreciosFile(event)"></label>
       <button class="btn btn-ghost btn-sm" style="color:var(--azul);background:var(--azul-c);border:1px solid var(--azul-c)" onclick="descargarPlantillaPrecios()">📋 Descargar plantilla actualizada</button>
@@ -183,33 +183,40 @@ input.comprar-input.tiene-valor{border-color:var(--teal);background:var(--teal-c
 
   <div class="card" id="card-carga" style="display:none">
     <div class="card-tit">Cargar los 4 archivos</div>
-    <div class="card-sub">Subí los exports de Axum tal cual se descargan (.xls). Se procesan en tu navegador y se guardan en la base de datos compartida — el jefe de compras los va a ver apenas termine la carga.</div>
+    <div class="card-sub">Subí los exports de Axum tal cual se descargan (.xls).</div>
+    <div class="cfg-row" style="border-top:none;padding-top:0;margin-top:0;margin-bottom:4px">
+      <div class="cfg-field" style="width:auto">
+        <label>Alcance del análisis</label>
+        <div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap">
+          <label class="chk-lbl"><input type="radio" name="modo-carga" value="ambos" checked onchange="onModoChange()"> Ambos depósitos</label>
+          <label class="chk-lbl"><input type="radio" name="modo-carga" value="solo_sl" onchange="onModoChange()"> Solo San Luis</label>
+          <label class="chk-lbl"><input type="radio" name="modo-carga" value="solo_vm" onchange="onModoChange()"> Solo Villa Mercedes</label>
+        </div>
+      </div>
+    </div>
+
     <div class="upload-grid">
       <div class="upload-box" id="box-stock_sl">
         <div class="up-icon">📦</div>
         <div class="up-label">Stock San Luis</div>
-        <div class="up-sub">Reporte de stock — depósito San Luis</div>
         <label class="up-btn">Elegir archivo<input type="file" accept=".xls,.xlsx" onchange="onFile(event,'stock_sl')"></label>
         <div class="up-file" id="file-stock_sl"></div>
       </div>
       <div class="upload-box" id="box-stock_vm">
         <div class="up-icon">📦</div>
         <div class="up-label">Stock Villa Mercedes</div>
-        <div class="up-sub">Reporte de stock — depósito Villa Mercedes</div>
         <label class="up-btn">Elegir archivo<input type="file" accept=".xls,.xlsx" onchange="onFile(event,'stock_vm')"></label>
         <div class="up-file" id="file-stock_vm"></div>
       </div>
       <div class="upload-box" id="box-ventas_sl">
         <div class="up-icon">🧾</div>
         <div class="up-label">Ventas San Luis</div>
-        <div class="up-sub">Ventas por período — zona San Luis</div>
         <label class="up-btn">Elegir archivo<input type="file" accept=".xls,.xlsx" onchange="onFile(event,'ventas_sl')"></label>
         <div class="up-file" id="file-ventas_sl"></div>
       </div>
       <div class="upload-box" id="box-ventas_vm">
         <div class="up-icon">🧾</div>
         <div class="up-label">Ventas Villa Mercedes</div>
-        <div class="up-sub">Ventas por período — zona Villa Mercedes</div>
         <label class="up-btn">Elegir archivo<input type="file" accept=".xls,.xlsx" onchange="onFile(event,'ventas_vm')"></label>
         <div class="up-file" id="file-ventas_vm"></div>
       </div>
@@ -230,8 +237,6 @@ input.comprar-input.tiene-valor{border-color:var(--teal);background:var(--teal-c
           <option value="deposito">Depósito (incl. reservado)</option>
         </select>
       </div>
-      <div class="cfg-note"><b>Días cubiertos:</b> el rango real que exportaste en los archivos de ventas. Si no son 7 días exactos, se proyecta a 7 días con un promedio diario.</div>
-      <div class="cfg-note"><b>Stock a usar:</b> por defecto "Disponible p/venta" (Depósito − Reservado), lo que hoy se puede vender.</div>
       <div class="spacer"></div>
       <button class="btn btn-teal btn-sm" id="btn-procesar" onclick="iniciarProceso()" disabled>Procesar y guardar ciclo</button>
     </div>
@@ -240,13 +245,10 @@ input.comprar-input.tiene-valor{border-color:var(--teal);background:var(--teal-c
   </div>
 
   <div id="seccion-datos" style="display:none">
-
     <div class="kpi-grid" id="kpi-grid"></div>
 
     <div class="card">
       <div class="card-tit">Comparativo Stock vs. Ventas</div>
-      <div class="card-sub">Cargá la cantidad a comprar de cada producto en <b>A comprar</b>. Se guarda sola en la base de datos a los pocos segundos de dejar de tipear (mirá el indicador junto al buscador). Filas en rojo: stock igual o menor a lo vendido.</div>
-
       <div class="filter-bar">
         <input type="text" id="f-buscar" placeholder="Buscar por código o descripción…" oninput="renderTabla()">
         <select id="f-proveedor" onchange="renderTabla()"><option value="">Todos los proveedores</option></select>
@@ -260,53 +262,17 @@ input.comprar-input.tiene-valor{border-color:var(--teal);background:var(--teal-c
 
       <div class="tbl-wrap">
         <table>
-          <thead>
-            <tr class="grp">
-              <th class="left" rowspan="2" style="background:var(--azul)">Proveedor / Producto</th>
-              <th colspan="3">Stock (u.)</th>
-              <th colspan="3">Ventas · proyectadas (u.)</th>
-              <th colspan="3">Diferencia (stock − ventas)</th>
-              <th rowspan="2">Precio unit.</th>
-              <th rowspan="2">Sugerido</th>
-              <th rowspan="2">A comprar</th>
-              <th rowspan="2">Estimado $</th>
-            </tr>
-            <tr>
-              <th>SL</th><th>VM</th><th>Total</th>
-              <th>SL</th><th>VM</th><th>Total</th>
-              <th>SL</th><th>VM</th><th>Total</th>
-            </tr>
-          </thead>
+          <thead id="tabla-thead"></thead>
           <tbody id="tbl-body"></tbody>
         </table>
       </div>
-
-      <div class="footer-bar">
-        <div class="legend">
-          <span><span class="sw" style="background:var(--rojo-c);border:1px solid var(--rojo)"></span>Stock ≤ ventas (alerta de quiebre)</span>
-          <span><span class="sw" style="background:var(--teal-c);border:1px solid var(--teal)"></span>Cantidad a comprar cargada</span>
-          <span>Precios: se cargan por código en la hoja <b>"Precios"</b> del Google Sheet.</span>
-        </div>
-      </div>
     </div>
   </div>
 
 </div>
-
-<div class="hist-overlay" id="hist-overlay">
-  <div class="hist-panel">
-    <div class="hist-panel-hdr">
-      <h2>🕘 Historial de ciclos de carga</h2>
-      <button class="hist-close" onclick="cerrarHistorial()">✕</button>
-    </div>
-    <div id="hist-content"><div class="loader">⏳ Cargando historial…</div></div>
-  </div>
-</div>
-
-<div class="toast" id="toast"></div>
 
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbzG5kT_5mL-8x5GoX0RwnhjrplXj6sJvdnYGmm4pGO6f62VL5w-jJQaqEB-7bDmYRz5/exec";
+const API_URL = 'https://script.google.com/macros/s/AKfycbzG5kT_5mL-8x5GoX0RwnhjrplXj6sJvdnYGmm4pGO6f62VL5w-jJQaqEB-7bDmYRz5/exec';
 
 let archivosRaw = { stock_sl: null, stock_vm: null, ventas_sl: null, ventas_vm: null };
 let productos = [];
@@ -314,189 +280,11 @@ let preciosMap = {};
 let preciosArr = [];
 let comprasManual = {};
 let cicloMeta = null;
+let modoActual = 'ambos';
 let providerRE = /\bS\.?\s?A\.?\b|\bSRL\b|\bS\.R\.L\.?\b|SOCIEDAD\s+AN[OÓ]NI/i;
-let saveTimer = null;
-
-window.addEventListener('DOMContentLoaded', () => {
-  if (!API_URL || API_URL.indexOf('PEGAR_AQUI') === 0) {
-    document.getElementById('setup-warning').style.display = 'block';
-    document.getElementById('loader-inicial').style.display = 'none';
-    return;
-  }
-  cargarEstadoDesdeBackend();
-});
-
-function apiGet(action){
-  return fetch(`${API_URL}?action=${action}`).then(r=>r.json());
-}
-function apiPost(payload){
-  return fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(payload)
-  }).then(r=>r.json());
-}
-
-function cargarEstadoDesdeBackend(){
-  document.getElementById('loader-inicial').style.display = 'flex';
-  apiGet('estado').then(data=>{
-    document.getElementById('loader-inicial').style.display = 'none';
-    preciosMap = {};
-    preciosArr = data.precios || [];
-    preciosArr.forEach(p => preciosMap[String(p.codigo).trim()] = Number(p.precio_unitario)||0);
-
-    if (data.cargado){
-      productos = data.productos || [];
-      cicloMeta = data.meta;
-      comprasManual = {};
-      productos.forEach(p=>{ if(Number(p.a_comprar)>0) comprasManual[p.codigo] = Number(p.a_comprar); });
-      mostrarBannerCargado();
-      poblarFiltroProveedor();
-      renderKPIs();
-      renderTabla();
-      document.getElementById('seccion-datos').style.display = 'block';
-      document.getElementById('card-carga').style.display = 'none';
-      document.getElementById('btn-exportar').disabled = false;
-    } else {
-      mostrarBannerVacio();
-      document.getElementById('seccion-datos').style.display = 'none';
-      document.getElementById('card-carga').style.display = 'block';
-      document.getElementById('btn-exportar').disabled = true;
-    }
-  }).catch(err=>{
-    document.getElementById('loader-inicial').style.display = 'none';
-    document.getElementById('banner-estado').innerHTML = `<div class="banner warn"><div class="b-icon">⚠️</div><div class="b-text">No se pudo conectar con el backend. Revisá la URL de <b>API_URL</b> y que el Apps Script esté desplegado como "Cualquier usuario". <br><span style="font-size:11px">${escHtml(String(err))}</span></div></div>`;
-  });
-}
-
-function mostrarBannerVacio(){
-  document.getElementById('banner-estado').innerHTML = `
-    <div class="banner warn">
-      <div class="b-icon">📭</div>
-      <div class="b-text"><b>No hay datos cargados.</b> Subí los 4 archivos abajo para iniciar un ciclo de pedido.</div>
-    </div>`;
-}
-function mostrarBannerCargado(){
-  const fecha = new Date(cicloMeta.fecha_carga).toLocaleString('es-AR');
-  const periodoTxt = (cicloMeta.periodoInicio && cicloMeta.periodoFin)
-    ? `<span class="periodo-chip">${cicloMeta.periodoInicio} → ${cicloMeta.periodoFin}</span> ` : '';
-  document.getElementById('banner-estado').innerHTML = `
-    <div class="banner ok">
-      <div class="b-icon">📅</div>
-      <div class="b-text"><b>Ciclo cargado el ${fecha}</b><br>Ventas del período ${periodoTxt}· proyectado a 7 días (base: ${cicloMeta.dias} días) · stock: ${etiquetaStockMode(cicloMeta.stockMode)}.</div>
-      <div class="b-actions"><button class="btn btn-white btn-sm" onclick="mostrarCargaManual()">↺ Cargar archivos nuevos</button></div>
-    </div>`;
-}
-function etiquetaStockMode(m){
-  return m==='total' ? 'Total (incl. camiones)' : m==='deposito' ? 'Depósito (incl. reservado)' : 'Disponible p/venta';
-}
-function mostrarCargaManual(){
-  document.getElementById('card-carga').style.display = 'block';
-  document.getElementById('card-carga').scrollIntoView({behavior:'smooth'});
-}
 
 function isBlank(v){ return v===null || v===undefined || v==='' || (typeof v==='number' && isNaN(v)); }
 function toNum(v){ if(isBlank(v)) return 0; const n = typeof v==='number' ? v : parseFloat(String(v).replace(',','.')); return isNaN(n)?0:n; }
-function isProviderText(s){
-  const letters = s.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ]/g,'');
-  if(!letters) return false;
-  if(letters !== letters.toUpperCase()) return false;
-  return providerRE.test(s);
-}
-function countNonBlank(row){
-  let idx = [];
-  row.forEach((v,i)=>{ if(!isBlank(v)) idx.push(i); });
-  return idx;
-}
-function escHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function fmt(n){ return (Math.round(n*100)/100).toLocaleString('es-AR',{maximumFractionDigits:2}); }
-function fmtMoney(n){ return n.toLocaleString('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}); }
-function showToast(msg, isErr){
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast show' + (isErr?' err':'');
-  setTimeout(()=>t.classList.remove('show'), 2800);
-}
-
-function renderPeriodoBanner(){
-  const cont = document.getElementById('periodo-banner');
-  const pSL = archivosRaw.ventas_sl && archivosRaw.ventas_sl.periodo;
-  const pVM = archivosRaw.ventas_vm && archivosRaw.ventas_vm.periodo;
-
-  if(!archivosRaw.ventas_sl && !archivosRaw.ventas_vm){ cont.innerHTML = ''; return; }
-
-  const faltaSL = archivosRaw.ventas_sl && !pSL;
-  const faltaVM = archivosRaw.ventas_vm && !pVM;
-
-  if(faltaSL || faltaVM){
-    const cuales = [faltaSL?'San Luis':null, faltaVM?'Villa Mercedes':null].filter(Boolean).join(' y ');
-    cont.innerHTML = `<div class="banner warn" style="margin-bottom:0;margin-top:14px">
-      <div class="b-icon">⚠️</div>
-      <div class="b-text">No pudimos detectar automáticamente el período de ventas en el archivo de <b>${cuales}</b>. Revisá que sea un export de Axum sin modificar, y confirmá manualmente el campo "Días cubiertos" antes de procesar.</div>
-    </div>`;
-    return;
-  }
-
-  if(pSL && pVM){
-    const coincide = pSL.inicioStr === pVM.inicioStr && pSL.finStr === pVM.finStr;
-    if(coincide){
-      cont.innerHTML = `<div class="banner ok" style="margin-bottom:0;margin-top:14px">
-        <div class="b-icon">📅</div>
-        <div class="b-text">Período de ventas detectado: <span class="periodo-chip">${pSL.inicioStr} → ${pSL.finStr}</span> · <b>${pSL.dias} días</b> — coincide en San Luis y Villa Mercedes.</div>
-      </div>`;
-      document.getElementById('cfg-dias').value = pSL.dias;
-    } else {
-      cont.innerHTML = `<div class="banner err" style="margin-bottom:0;margin-top:14px">
-        <div class="b-icon">🚨</div>
-        <div class="b-text"><b>Los archivos de ventas NO cubren el mismo período.</b><br>
-        San Luis: <span class="periodo-chip">${pSL.inicioStr} → ${pSL.finStr} · ${pSL.dias}d</span>
-        Villa Mercedes: <span class="periodo-chip">${pVM.inicioStr} → ${pVM.finStr} · ${pVM.dias}d</span><br>
-        Revisá los exports antes de continuar — comparar períodos distintos entre depósitos puede distorsionar las alertas de quiebre.</div>
-      </div>`;
-    }
-    return;
-  }
-
-  // solo uno de los dos cargado todavía
-  const p = pSL || pVM;
-  const cual = pSL ? 'San Luis' : 'Villa Mercedes';
-  cont.innerHTML = `<div class="banner warn" style="margin-bottom:0;margin-top:14px">
-    <div class="b-icon">📅</div>
-    <div class="b-text">Período detectado en <b>${cual}</b>: <span class="periodo-chip">${p.inicioStr} → ${p.finStr}</span> · ${p.dias} días. Falta subir el otro archivo de ventas para confirmar que coincida.</div>
-  </div>`;
-}
-
-function onFile(evt, key){
-  const file = evt.target.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    try{
-      const data = new Uint8Array(e.target.result);
-      const wb = XLSX.read(data, {type:'array', cellDates:false});
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:null});
-      let periodo = null;
-      if(key === 'ventas_sl' || key === 'ventas_vm'){
-        periodo = detectarPeriodoVentas(rows);
-      }
-      archivosRaw[key] = { name: file.name, rows, periodo };
-      document.getElementById('box-'+key).classList.add('filled');
-      let fileHtml = '✓ ' + escHtml(file.name);
-      if(key === 'ventas_sl' || key === 'ventas_vm'){
-        fileHtml += periodo
-          ? `<br><span style="color:var(--azul)">${periodo.inicioStr} → ${periodo.finStr} · ${periodo.dias} días</span>`
-          : `<br><span style="color:var(--rojo)">⚠️ período no detectado</span>`;
-      }
-      document.getElementById('file-'+key).innerHTML = fileHtml;
-      document.getElementById('btn-procesar').disabled = !(archivosRaw.stock_sl && archivosRaw.stock_vm && archivosRaw.ventas_sl && archivosRaw.ventas_vm);
-      if(key === 'ventas_sl' || key === 'ventas_vm') renderPeriodoBanner();
-    }catch(err){
-      alert('No se pudo leer el archivo "' + file.name + '". Verificá que sea un .xls/.xlsx válido.\n\n' + err.message);
-    }
-  };
-  reader.readAsArrayBuffer(file);
-}
 
 function detectarFormatoStock(rows){
   let tieneCodProv = false;
@@ -507,9 +295,14 @@ function detectarFormatoStock(rows){
     }
     if(tieneCodProv) break;
   }
-  return tieneCodProv
-    ? { descIdx: 2, dispBIdx: 12, dispUIdx: 13, totBIdx: 4, totUIdx: 5, depBIdx: 8, depUIdx: 9 }
-    : { descIdx: 1, dispBIdx: 13, dispUIdx: 14, totBIdx: 5, totUIdx: 6, depBIdx: 9, depUIdx: 10 };
+  
+  if (tieneCodProv) {
+    // San Luis
+    return { descIdx: 2, dispBIdx: 12, dispUIdx: 13, totBIdx: 4, totUIdx: 5, depBIdx: 8, depUIdx: 9 };
+  } else {
+    // Villa Mercedes
+    return { descIdx: 1, dispBIdx: 13, dispUIdx: 14, totBIdx: 5, totUIdx: 6, depBIdx: 9, depUIdx: 10 };
+  }
 }
 
 function parseStock(rows){
@@ -522,25 +315,22 @@ function parseStock(rows){
     const row = rawRow || [];
     const code = row[0];
     const desc = row[fmt.descIdx];
-    const col3 = row[3];
-
-    if(typeof col3 === 'string' && /sub\s*total/i.test(col3)) continue;
-
-    const nonBlank = countNonBlank(row);
-    if(nonBlank.length === 1 && nonBlank[0] === 0 && typeof row[0] === 'string'){
-      const txt = row[0].trim();
-      if(isProviderText(txt)) proveedorActual = txt;
-      continue;
-    }
 
     if(!isBlank(code) && !isBlank(desc)){
       const codeStr = String(code).trim();
       if(codeStr === 'Cód.' || codeStr === 'Cód. Prov') continue;
 
       let valor;
-      if(stockMode === 'disponible') valor = toNum(row[fmt.dispBIdx]) + toNum(row[fmt.dispUIdx]);
-      else if(stockMode === 'deposito') valor = toNum(row[fmt.depBIdx]) + toNum(row[fmt.depUIdx]);
-      else valor = toNum(row[fmt.totBIdx]) + toNum(row[fmt.totUIdx]);
+      if(stockMode === 'disponible') {
+        valor = toNum(row[fmt.dispBIdx]) + toNum(row[fmt.dispUIdx]);
+        if (valor === 0 && toNum(row[fmt.depUIdx]) > 0 && fmt.descIdx === 2) {
+          valor = toNum(row[fmt.depUIdx]); 
+        }
+      } else if(stockMode === 'deposito') {
+        valor = toNum(row[fmt.depBIdx]) + toNum(row[fmt.depUIdx]);
+      } else {
+        valor = toNum(row[fmt.totBIdx]) + toNum(row[fmt.totUIdx]);
+      }
 
       out.push({ codigo: codeStr, descripcion: String(desc).trim(), proveedor: proveedorActual, stock: valor });
     }
@@ -548,43 +338,7 @@ function parseStock(rows){
   return out;
 }
 
-function detectarPeriodoVentas(rows){
-  const re = /fecha\s+entre\s+(\d{1,2}\/\d{1,2}\/\d{4})\s+y\s+(\d{1,2}\/\d{1,2}\/\d{4})/i;
-  for(let i=0;i<Math.min(rows.length,10);i++){
-    const row = rows[i] || [];
-    for(const cell of row){
-      if(typeof cell === 'string'){
-        const m = cell.match(re);
-        if(m){
-          const parseDDMMYYYY = s => {
-            const [d,mo,y] = s.split('/').map(n=>parseInt(n,10));
-            return new Date(y, mo-1, d);
-          };
-          const inicio = parseDDMMYYYY(m[1]);
-          const fin = parseDDMMYYYY(m[2]);
-          const dias = Math.round((fin - inicio) / 86400000) + 1;
-          return { inicioStr: m[1], finStr: m[2], inicio, fin, dias };
-        }
-      }
-    }
-  }
-  return null;
-}
-function fmtFechaCorta(d){
-  return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
-}
-
-function detectarColCantVentas(rows){
-  for(let i=0;i<Math.min(rows.length,12);i++){
-    const row = rows[i] || [];
-    const idx = row.findIndex(c => typeof c === 'string' && /^cant\.?$/i.test(c.trim()));
-    if(idx >= 0) return idx + 1;
-  }
-  return 7;
-}
-
 function parseVentas(rows){
-  const cantIdx = detectarColCantVentas(rows);
   const out = [];
   let proveedorActual = null;
 
@@ -593,487 +347,15 @@ function parseVentas(rows){
     const codProv = row[0];
     const codInt = row[1];
     const desc = row[2];
-    const cant = row[cantIdx];
-
-    if(typeof codProv === 'string' && /total\s*general/i.test(codProv)) continue;
-    if(typeof codProv === 'string' && codProv.trim() === 'Cod.Prov.') continue;
-
-    const nonBlank = countNonBlank(row);
-    if(nonBlank.length === 1 && nonBlank[0] === 0 && typeof row[0] === 'string' && isBlank(codInt) && isBlank(desc)){
-      const txt = row[0].trim();
-      if(isProviderText(txt)) proveedorActual = txt;
-      continue;
-    }
 
     const code = !isBlank(codInt) ? codInt : codProv;
     if(!isBlank(code) && !isBlank(desc) && String(desc).trim() !== 'Descripcion'){
-      out.push({ codigo: String(code).trim(), descripcion: String(desc).trim(), proveedor: proveedorActual, ventas: toNum(cant) });
+      const valCant = !isBlank(row[6]) && toNum(row[6]) > 0 ? toNum(row[6]) : toNum(row[7]);
+      out.push({ codigo: String(code).trim(), descripcion: String(desc).trim(), proveedor: proveedorActual, ventas: valCant });
     }
   }
   return out;
 }
-
-function construirDataset(){
-  const stockSL = parseStock(archivosRaw.stock_sl.rows);
-  const stockVM = parseStock(archivosRaw.stock_vm.rows);
-  const ventasSL = parseVentas(archivosRaw.ventas_sl.rows);
-  const ventasVM = parseVentas(archivosRaw.ventas_vm.rows);
-
-  const dias = parseFloat(document.getElementById('cfg-dias').value) || 7;
-  const factorProy = 7 / dias;
-
-  const stockSLMap = {}; stockSL.forEach(p=>stockSLMap[p.codigo]=p);
-  const stockVMMap = {}; stockVM.forEach(p=>stockVMMap[p.codigo]=p);
-  const ventasSLMap = {}; const ventasSLProv = {};
-  ventasSL.forEach(p=>{ ventasSLMap[p.codigo] = (ventasSLMap[p.codigo]||0) + p.ventas; ventasSLProv[p.codigo]=p.proveedor; });
-  const ventasVMMap = {}; const ventasVMProv = {};
-  ventasVM.forEach(p=>{ ventasVMMap[p.codigo] = (ventasVMMap[p.codigo]||0) + p.ventas; ventasVMProv[p.codigo]=p.proveedor; });
-
-  const todosCodigos = new Set([
-    ...Object.keys(stockSLMap), ...Object.keys(stockVMMap),
-    ...Object.keys(ventasSLMap), ...Object.keys(ventasVMMap)
-  ]);
-
-  const out = [];
-  todosCodigos.forEach(codigo=>{
-    const sSL = stockSLMap[codigo]; const sVM = stockVMMap[codigo];
-    const stockSLv = sSL ? sSL.stock : 0;
-    const stockVMv = sVM ? sVM.stock : 0;
-    const ventasSLraw = ventasSLMap[codigo] || 0;
-    const ventasVMraw = ventasVMMap[codigo] || 0;
-    const ventasSLv = ventasSLraw * factorProy;
-    const ventasVMv = ventasVMraw * factorProy;
-
-    const descripcion = (sSL && sSL.descripcion) || (sVM && sVM.descripcion) ||
-                         (ventasSL.find(p=>p.codigo===codigo)||{}).descripcion ||
-                         (ventasVM.find(p=>p.codigo===codigo)||{}).descripcion || '(sin descripción)';
-    const proveedor = (sSL && sSL.proveedor) || (sVM && sVM.proveedor) || ventasSLProv[codigo] || ventasVMProv[codigo] || 'Sin proveedor asignado';
-
-    const stockTotal = stockSLv + stockVMv;
-    const ventasTotal = ventasSLv + ventasVMv;
-    const diffSL = stockSLv - ventasSLv;
-    const diffVM = stockVMv - ventasVMv;
-    const diffTotal = stockTotal - ventasTotal;
-
-    const alerta = (ventasSLraw > 0 && stockSLv <= ventasSLv) ||
-                   (ventasVMraw > 0 && stockVMv <= ventasVMv) ||
-                   ((ventasSLraw+ventasVMraw) > 0 && stockTotal <= ventasTotal);
-
-    const sugerido = Math.max(0, Math.ceil(ventasTotal - stockTotal));
-
-    out.push({
-      codigo, descripcion, proveedor,
-      stock_sl: stockSLv, stock_vm: stockVMv, stock_total: stockTotal,
-      ventas_sl: ventasSLv, ventas_vm: ventasVMv, ventas_total: ventasTotal,
-      diff_sl: diffSL, diff_vm: diffVM, diff_total: diffTotal,
-      alerta, sugerido, a_comprar: 0
-    });
-  });
-
-  out.sort((a,b)=> a.proveedor.localeCompare(b.proveedor) || a.descripcion.localeCompare(b.descripcion));
-
-  const pSL = archivosRaw.ventas_sl && archivosRaw.ventas_sl.periodo;
-  const pVM = archivosRaw.ventas_vm && archivosRaw.ventas_vm.periodo;
-  const periodoRef = pSL || pVM;
-
-  return {
-    productos: out, dias, stockMode: document.getElementById('cfg-stockcol').value,
-    periodoInicio: periodoRef ? periodoRef.inicioStr : '',
-    periodoFin: periodoRef ? periodoRef.finStr : ''
-  };
-}
-
-function iniciarProceso(){
-  const pSL = archivosRaw.ventas_sl && archivosRaw.ventas_sl.periodo;
-  const pVM = archivosRaw.ventas_vm && archivosRaw.ventas_vm.periodo;
-  const dias = document.getElementById('cfg-dias').value;
-
-  if(!pSL || !pVM){
-    if(!confirm(`No pudimos detectar el período de ventas en uno de los dos archivos.\n\n¿Confirmás que el archivo realmente cubre ${dias} día(s), como está puesto en "Días cubiertos"?`)) return;
-  } else if(pSL.inicioStr !== pVM.inicioStr || pSL.finStr !== pVM.finStr){
-    if(!confirm(`Los archivos de ventas cubren períodos DISTINTOS:\n\nSan Luis: ${pSL.inicioStr} → ${pSL.finStr} (${pSL.dias} días)\nVilla Mercedes: ${pVM.inicioStr} → ${pVM.finStr} (${pVM.dias} días)\n\n¿Confirmás que querés continuar de todas formas?`)) return;
-  }
-  procesarYSubir(false);
-}
-
-function procesarYSubir(force){
-  const btn = document.getElementById('btn-procesar');
-  btn.disabled = true; btn.textContent = 'Procesando…';
-  let ds;
-  try {
-    ds = construirDataset();
-  } catch(err) {
-    alert('Error al procesar los archivos: ' + err.message);
-    btn.disabled = false; btn.textContent = 'Procesar y guardar ciclo';
-    return;
-  }
-  document.getElementById('parse-status').innerHTML = `Procesados ${ds.productos.length} productos. Guardando en la base de datos…`;
-
-  apiPost({ action:'cargar', force: !!force, dias: ds.dias, stockMode: ds.stockMode,
-            periodoInicio: ds.periodoInicio, periodoFin: ds.periodoFin, productos: ds.productos })
-    .then(res=>{
-      if(res.requiereConfirmacion){
-        const fecha = new Date(res.fechaCargaActual).toLocaleString('es-AR');
-        if(confirm(`Ya hay un ciclo cargado desde el ${fecha} (puede tener cantidades ya cargadas por el jefe de compras).\n\n¿Confirmás que querés reemplazarlo?`)){
-          procesarYSubir(true);
-        } else {
-          btn.disabled = false; btn.textContent = 'Procesar y guardar ciclo';
-          document.getElementById('parse-status').innerHTML = 'Carga cancelada.';
-        }
-        return;
-      }
-      if(res.ok){
-        showToast('Ciclo guardado correctamente ✓');
-        archivosRaw = { stock_sl: null, stock_vm: null, ventas_sl: null, ventas_vm: null };
-        ['stock_sl','stock_vm','ventas_sl','ventas_vm'].forEach(k=>{
-          document.getElementById('box-'+k).classList.remove('filled');
-          document.getElementById('file-'+k).textContent = '';
-        });
-        document.getElementById('periodo-banner').innerHTML = '';
-        btn.disabled = true; btn.textContent = 'Procesar y guardar ciclo';
-        document.getElementById('parse-status').innerHTML = '';
-        cargarEstadoDesdeBackend();
-      } else {
-        alert('No se pudo guardar el ciclo: ' + (res.error||'error desconocido'));
-        btn.disabled = false; btn.textContent = 'Procesar y guardar ciclo';
-      }
-    })
-    .catch(err=>{
-      alert('Error de conexión al guardar: ' + err);
-      btn.disabled = false; btn.textContent = 'Procesar y guardar ciclo';
-    });
-}
-
-function renderKPIs(){
-  const total = productos.length;
-  const alertas = productos.filter(p=>p.alerta).length;
-  const proveedores = new Set(productos.map(p=>p.proveedor)).size;
-  const cargados = Object.values(comprasManual).filter(v=>toNum(v)>0).length;
-  let estimado = 0, sinPrecio = 0;
-  productos.forEach(p=>{
-    const cant = comprasManual[p.codigo]||0;
-    if(cant>0){
-      const precio = preciosMap[p.codigo];
-      if(precio) estimado += cant*precio; else sinPrecio++;
-    }
-  });
-  const grid = document.getElementById('kpi-grid');
-  grid.innerHTML = `
-    <div class="kpi"><div class="kpi-val">${total}</div><div class="kpi-lbl">Productos</div></div>
-    <div class="kpi alerta"><div class="kpi-val">${alertas}</div><div class="kpi-lbl">En alerta de quiebre</div></div>
-    <div class="kpi"><div class="kpi-val">${proveedores}</div><div class="kpi-lbl">Proveedores</div></div>
-    <div class="kpi"><div class="kpi-val">${cargados}</div><div class="kpi-lbl">Con cantidad a comprar</div></div>
-    <div class="kpi dinero"><div class="kpi-val">${estimado>0?fmtMoney(estimado):'—'}</div><div class="kpi-lbl">Estimado del pedido${sinPrecio>0?` (${sinPrecio} sin precio)`:''}</div></div>
-  `;
-}
-
-function poblarFiltroProveedor(){
-  const sel = document.getElementById('f-proveedor');
-  const provs = [...new Set(productos.map(p=>p.proveedor))].sort();
-  sel.innerHTML = '<option value="">Todos los proveedores</option>' + provs.map(p=>`<option value="${escHtml(p)}">${escHtml(p)}</option>`).join('');
-}
-
-function renderTabla(){
-  const buscar = document.getElementById('f-buscar').value.trim().toLowerCase();
-  const provFiltro = document.getElementById('f-proveedor').value;
-  const soloAlertas = document.getElementById('f-alertas').checked;
-  const ocultarSinMov = document.getElementById('f-conventas').checked;
-  const soloConCompra = document.getElementById('f-solocompra').checked;
-
-  const filtrados = productos.filter(p=>{
-    if(buscar && !(String(p.codigo).toLowerCase().includes(buscar) || String(p.descripcion).toLowerCase().includes(buscar))) return false;
-    if(provFiltro && p.proveedor !== provFiltro) return false;
-    if(soloAlertas && !p.alerta) return false;
-    if(ocultarSinMov && toNum(p.stock_total)===0 && toNum(p.ventas_total)===0) return false;
-    if(soloConCompra && toNum(comprasManual[p.codigo]) <= 0) return false;
-    return true;
-  });
-
-  document.getElementById('count-pill').textContent = filtrados.length + ' productos';
-
-  const body = document.getElementById('tbl-body');
-  if(filtrados.length===0){
-    body.innerHTML = `<tr><td colspan="14"><div class="empty-state"><div class="ico">🔍</div>No hay productos que coincidan con los filtros.</div></td></tr>`;
-    return;
-  }
-
-  let html = '';
-  let provAnterior = null;
-  filtrados.forEach(p=>{
-    const cls = p.alerta ? 'alerta' : (toNum(p.stock_total)===0 && toNum(p.ventas_total)===0 ? 'sin-mov' : '');
-    const valCompra = comprasManual[p.codigo] !== undefined ? comprasManual[p.codigo] : '';
-    const tieneValor = toNum(valCompra) > 0;
-    const precio = preciosMap[p.codigo];
-    const estimado = precio ? precio * toNum(valCompra) : null;
-
-    html += `<tr class="${cls}">
-      <td class="left">
-        ${p.proveedor !== provAnterior ? `<div class="prov-tag">${escHtml(p.proveedor)}</div>` : ''}
-        <div class="desc-txt">${escHtml(p.descripcion)}${p.alerta?'<span class="badge-alerta">ALERTA</span>':''}</div>
-        <div class="cod-txt">${escHtml(p.codigo)}</div>
-      </td>
-      <td>${fmt(p.stock_sl)}</td><td>${fmt(p.stock_vm)}</td><td><b>${fmt(p.stock_total)}</b></td>
-      <td>${fmt(p.ventas_sl)}</td><td>${fmt(p.ventas_vm)}</td><td><b>${fmt(p.ventas_total)}</b></td>
-      <td class="${p.diff_sl<0?'neg':'pos'}">${fmt(p.diff_sl)}</td>
-      <td class="${p.diff_vm<0?'neg':'pos'}">${fmt(p.diff_vm)}</td>
-      <td class="${p.diff_total<0?'neg':'pos'}"><b>${fmt(p.diff_total)}</b></td>
-      <td class="precio-txt ${precio?'':'sinprecio'}">${precio?fmtMoney(precio):'sin precio'}</td>
-      <td class="sug-txt">${p.sugerido>0?fmt(p.sugerido):'—'}</td>
-      <td><input type="number" min="0" step="1" class="comprar-input ${tieneValor?'tiene-valor':''}"
-             value="${valCompra}" placeholder="0"
-             onchange="setCompra('${String(p.codigo).replace(/'/g,"\\'")}', this.value, this)"></td>
-      <td class="estimado-txt">${estimado!==null && estimado>0 ? fmtMoney(estimado) : '—'}</td>
-    </tr>`;
-    provAnterior = p.proveedor;
-  });
-  body.innerHTML = html;
-}
-
-function setCompra(codigo, valor, el){
-  const n = toNum(valor);
-  if(n > 0){ comprasManual[codigo] = n; el.classList.add('tiene-valor'); }
-  else { delete comprasManual[codigo]; el.classList.remove('tiene-valor'); }
-  const prod = productos.find(p=>p.codigo===codigo);
-  if(prod) prod.a_comprar = n;
-  renderKPIs();
-  renderTabla();
-  programarGuardado();
-}
-
-function programarGuardado(){
-  const pill = document.getElementById('save-pill');
-  pill.className = 'save-pill saving'; pill.textContent = 'guardando…';
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(guardarComprasEnBackend, 1200);
-}
-function guardarComprasEnBackend(){
-  const pill = document.getElementById('save-pill');
-  apiPost({ action:'guardarCompras', compras: comprasManual })
-    .then(res=>{
-      if(res.ok){ pill.className='save-pill saved'; pill.textContent='guardado ✓ ' + new Date(res.guardado).toLocaleTimeString('es-AR'); }
-      else { pill.className='save-pill error'; pill.textContent='error al guardar'; }
-    })
-    .catch(()=>{ pill.className='save-pill error'; pill.textContent='error de conexión'; });
-}
-
-function confirmarGenerarYLimpiar(){
-  const items = productos.filter(p => toNum(comprasManual[p.codigo]) > 0);
-  if(items.length === 0){
-    alert('No hay cantidades cargadas en "A comprar". Completá al menos un producto antes de generar el pedido.');
-    return;
-  }
-  if(!confirm(`Se va a generar el Excel de pedidos con ${items.length} producto(s) y luego se va a LIMPIAR el ciclo actual para que la administrativa pueda cargar los archivos del próximo pedido.\n\n¿Confirmás?`)) return;
-
-  clearTimeout(saveTimer);
-  guardarComprasEnBackend();
-
-  exportarPedidos(items);
-
-  apiPost({ action:'limpiar' }).then(res=>{
-    if(res.ok){
-      showToast('Pedido generado y ciclo limpiado ✓');
-      productos = []; comprasManual = {};
-      cargarEstadoDesdeBackend();
-    } else {
-      showToast('El Excel se generó, pero no se pudo limpiar el ciclo: ' + (res.error||''), true);
-    }
-  }).catch(err=>{
-    showToast('El Excel se generó, pero hubo un error de conexión al limpiar el ciclo.', true);
-  });
-}
-
-function exportarPedidos(items){
-  const porProveedor = {};
-  items.forEach(p=>{
-    if(!porProveedor[p.proveedor]) porProveedor[p.proveedor] = [];
-    porProveedor[p.proveedor].push(p);
-  });
-
-  const wb = XLSX.utils.book_new();
-
-  const resumenAOA = [
-    ['Pedidos de Compra — Congelados Puntanos'],
-    ['Generado: ' + new Date().toLocaleString('es-AR')],
-    ['Ciclo cargado: ' + (cicloMeta ? new Date(cicloMeta.fecha_carga).toLocaleString('es-AR') : '')],
-    ['Período de ventas: ' + (cicloMeta && cicloMeta.periodoInicio ? `${cicloMeta.periodoInicio} → ${cicloMeta.periodoFin}` : `(no detectado — base ${cicloMeta?cicloMeta.dias:''} días)`)],
-    [],
-    ['Proveedor', 'Cantidad de productos', 'Unidades totales a pedir', 'Estimado $']
-  ];
-  let granTotalUnid = 0, granTotalMoney = 0;
-  Object.keys(porProveedor).sort().forEach(prov=>{
-    const arr = porProveedor[prov];
-    const totalUnid = arr.reduce((s,p)=>s+toNum(comprasManual[p.codigo]),0);
-    const totalMoney = arr.reduce((s,p)=>{ const pr=preciosMap[p.codigo]; return s + (pr? pr*toNum(comprasManual[p.codigo]) : 0); },0);
-    granTotalUnid += totalUnid; granTotalMoney += totalMoney;
-    resumenAOA.push([prov, arr.length, totalUnid, totalMoney||'']);
-  });
-  resumenAOA.push([]);
-  resumenAOA.push(['TOTAL', items.length, granTotalUnid, granTotalMoney||'']);
-  const wsResumen = XLSX.utils.aoa_to_sheet(resumenAOA);
-  wsResumen['!cols'] = [{wch:38},{wch:22},{wch:22},{wch:16}];
-  XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen');
-
-  Object.keys(porProveedor).sort().forEach(prov=>{
-    const arr = porProveedor[prov];
-    const aoa = [
-      ['Pedido de Compra — ' + prov],
-      ['Generado: ' + new Date().toLocaleString('es-AR')],
-      [],
-      ['Código', 'Descripción', 'Stock SL', 'Stock VM', 'Stock Total', 'Ventas Total (proy.)', 'Precio unit.', 'Cantidad a Comprar', 'Estimado $']
-    ];
-    arr.sort((a,b)=>a.descripcion.localeCompare(b.descripcion));
-    arr.forEach(p=>{
-      const cant = toNum(comprasManual[p.codigo]);
-      const precio = preciosMap[p.codigo] || '';
-      aoa.push([p.codigo, p.descripcion, Math.round(p.stock_sl*100)/100, Math.round(p.stock_vm*100)/100,
-                Math.round(p.stock_total*100)/100, Math.round(p.ventas_total*100)/100, precio, cant, precio?precio*cant:'']);
-    });
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{wch:12},{wch:42},{wch:10},{wch:10},{wch:12},{wch:16},{wch:12},{wch:14},{wch:14}];
-    let sheetName = prov.replace(/[\\\/\?\*\[\]:]/g,'').substring(0,31) || 'Proveedor';
-    let base = sheetName, i2 = 1;
-    while(wb.SheetNames.includes(sheetName)){ sheetName = (base.substring(0,28) + '_' + (++i2)); }
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
-  });
-
-  const fecha = new Date().toISOString().slice(0,10);
-  XLSX.writeFile(wb, `Pedidos_Compra_CongeladosPuntanos_${fecha}.xlsx`);
-}
-
-// ══════════════════════════════════════════════════════════════════
-// PRECIOS — importar plantilla / descargar plantilla actualizada
-// ══════════════════════════════════════════════════════════════════
-function normalizarHeader(h){
-  return String(h||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
-}
-function onPreciosFile(evt){
-  const file = evt.target.files[0];
-  if(!file) return;
-  const status = document.getElementById('precios-status');
-  status.textContent = 'Leyendo archivo…';
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const data = new Uint8Array(e.target.result);
-      const wb = XLSX.read(data, {type:'array', cellDates:false});
-      const nombreHoja = wb.SheetNames.includes('Precios') ? 'Precios' : wb.SheetNames[0];
-      const rows = XLSX.utils.sheet_to_json(wb.Sheets[nombreHoja], {header:1, raw:true, defval:null});
-      if(!rows.length){ status.textContent = 'El archivo está vacío.'; return; }
-
-      const header = rows[0].map(normalizarHeader);
-      const idxCodigo = header.findIndex(h => h.includes('codigo'));
-      const idxDesc = header.findIndex(h => h.includes('descripcion'));
-      const idxProv = header.findIndex(h => h.includes('proveedor'));
-      const idxPrecio = header.findIndex(h => h.includes('precio'));
-
-      if(idxCodigo < 0 || idxPrecio < 0){
-        status.textContent = '⚠️ No se encontraron las columnas "Código" y "Precio unitario" en la primera fila.';
-        return;
-      }
-
-      const items = [];
-      for(let i=1;i<rows.length;i++){
-        const row = rows[i] || [];
-        const codigo = row[idxCodigo];
-        const precio = row[idxPrecio];
-        if(isBlank(codigo) || isBlank(precio)) continue;
-        const n = toNum(precio);
-        if(isNaN(n) || n < 0) continue;
-        items.push({
-          codigo: String(codigo).trim(),
-          descripcion: idxDesc>=0 ? row[idxDesc] : '',
-          proveedor: idxProv>=0 ? row[idxProv] : '',
-          precio_unitario: n
-        });
-      }
-
-      if(!items.length){ status.textContent = 'No se encontraron filas con código y precio cargados.'; return; }
-
-      status.textContent = `Subiendo ${items.length} precio(s)…`;
-      apiPost({ action:'cargarPrecios', precios: items }).then(res=>{
-        if(res.ok){
-          status.textContent = `✓ ${res.actualizados} actualizado(s), ${res.nuevos} nuevo(s).`;
-          showToast('Precios actualizados ✓');
-          if(productos.length){ cargarEstadoDesdeBackend(); } // refresca preciosMap y recalcula estimados
-        } else {
-          status.textContent = '⚠️ ' + (res.error || 'No se pudo actualizar');
-        }
-      }).catch(err=>{
-        status.textContent = '⚠️ Error de conexión al subir precios.';
-      });
-    } catch(err){
-      status.textContent = '⚠️ No se pudo leer el archivo: ' + err.message;
-    }
-    evt.target.value = '';
-  };
-  reader.readAsArrayBuffer(file);
-}
-
-function descargarPlantillaPrecios(){
-  // Base: lo que ya está en la hoja Precios (con su precio actual, si lo tiene)
-  const base = {};
-  preciosArr.forEach(p => base[String(p.codigo).trim()] = {
-    codigo: p.codigo, descripcion: p.descripcion, proveedor: p.proveedor, precio_unitario: p.precio_unitario
-  });
-  // Suma cualquier producto del ciclo actual que todavía no tenga precio cargado
-  productos.forEach(p=>{
-    if(!base[p.codigo]) base[p.codigo] = { codigo: p.codigo, descripcion: p.descripcion, proveedor: p.proveedor, precio_unitario: '' };
-  });
-
-  const lista = Object.values(base);
-  if(!lista.length){
-    alert('Todavía no hay productos ni precios cargados. Usá primero la plantilla inicial o cargá un ciclo de stock/ventas.');
-    return;
-  }
-  lista.sort((a,b)=> String(a.proveedor).localeCompare(String(b.proveedor)) || String(a.descripcion).localeCompare(String(b.descripcion)));
-
-  const aoa = [['Código','Descripción','Proveedor','Precio unitario','Actualizado']];
-  lista.forEach(p => aoa.push([p.codigo, p.descripcion, p.proveedor, p.precio_unitario || '', '']));
-
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{wch:12},{wch:46},{wch:30},{wch:16},{wch:14}];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Precios');
-  XLSX.writeFile(wb, `Plantilla_Precios_CongeladosPuntanos_${new Date().toISOString().slice(0,10)}.xlsx`);
-}
-
-function abrirHistorial(){
-  document.getElementById('hist-overlay').classList.add('open');
-  document.getElementById('hist-content').innerHTML = '<div class="loader">⏳ Cargando historial…</div>';
-  apiGet('historial').then(data=>{
-    const hist = data.historial || [];
-    if(hist.length===0){
-      document.getElementById('hist-content').innerHTML = '<div class="empty-state"><div class="ico">🕘</div>Todavía no hay ciclos registrados.</div>';
-      return;
-    }
-    let html = `<table class="hist-tbl"><thead><tr>
-      <th>Carga</th><th>Período de ventas</th><th>Estado</th><th>Productos</th><th>Alertas</th>
-      <th>Pedido generado</th><th>Ítems pedidos</th><th>Unidades</th><th>Estimado $</th>
-    </tr></thead><tbody>`;
-    hist.forEach(h=>{
-      const fechaCarga = h.fecha_carga ? new Date(h.fecha_carga).toLocaleString('es-AR') : '—';
-      const fechaPedido = h.fecha_pedido ? new Date(h.fecha_pedido).toLocaleString('es-AR') : '—';
-      const estadoCls = h.estado==='Cerrado' ? 'cerrado' : 'en-proceso';
-      const periodo = (h.periodo_inicio && h.periodo_fin) ? `${h.periodo_inicio} → ${h.periodo_fin} (${h.dias_cubiertos}d)` : `${h.dias_cubiertos}d (sin detectar)`;
-      html += `<tr>
-        <td>${fechaCarga}</td>
-        <td>${periodo}</td>
-        <td><span class="estado-chip ${estadoCls}">${escHtml(h.estado)}</span></td>
-        <td>${h.cantidad_productos}</td>
-        <td>${h.cantidad_alertas}</td>
-        <td>${fechaPedido}</td>
-        <td>${h.items_pedido||'—'}</td>
-        <td>${h.unidades_pedido?fmt(h.unidades_pedido):'—'}</td>
-        <td>${h.valorizado_estimado?fmtMoney(h.valorizado_estimado):'—'}</td>
-      </tr>`;
-    });
-    html += '</tbody></table>';
-    document.getElementById('hist-content').innerHTML = html;
-  }).catch(err=>{
-    document.getElementById('hist-content').innerHTML = `<div class="empty-state">⚠️ No se pudo cargar el historial.<br><span style="font-size:11px">${escHtml(String(err))}</span></div>`;
-  });
-}
-function cerrarHistorial(){ document.getElementById('hist-overlay').classList.remove('open'); }
 </script>
 </body>
 </html>
