@@ -320,7 +320,7 @@ input.comprar-input.tiene-valor{border-color:var(--teal);background:var(--teal-c
 <div class="toast" id="toast"></div>
 
 <script>
-const API_URL = 'https://script.google.com/macros/s/AKfycbwKFnWIlJXfNK92nOZIrA0wOWSQlWswxyrKt2huSzzjHk0WR1jrAMPlHLLqnLuCtxO4/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzG5kT_5mL-8x5GoX0RwnhjrplXj6sJvdnYGmm4pGO6f62VL5w-jJQaqEB-7bDmYRz5/exec';
 
 let archivosRaw = { stock_sl: null, stock_vm: null, ventas_sl: null, ventas_vm: null };
 let productos = [];
@@ -631,9 +631,7 @@ function detectarFormatoStock(rows){
     }
     if(tieneCodProv) break;
   }
-  return tieneCodProv
-    ? { descIdx: 2, dispBIdx: 12, dispUIdx: 13, totBIdx: 4, totUIdx: 5, depBIdx: 8, depUIdx: 9 }
-    : { descIdx: 1, dispBIdx: 13, dispUIdx: 14, totBIdx: 5, totUIdx: 6, depBIdx: 9, depUIdx: 10 };
+  return { descIdx: tieneCodProv ? 2 : 1 };
 }
 
 function parseStock(rows){
@@ -646,9 +644,10 @@ function parseStock(rows){
     const row = rawRow || [];
     const code = row[0];
     const desc = row[fmt.descIdx];
-    const col3 = row[3];
 
-    if(typeof col3 === 'string' && /sub\s*total/i.test(col3)) continue;
+    // fila de subtotal: la detectamos buscando el texto en toda la fila
+    // (su posición exacta varía según el ancho del export)
+    if(row.some(c => typeof c === 'string' && /sub\s*total/i.test(c))) continue;
 
     const nonBlank = countNonBlank(row);
     if(nonBlank.length === 1 && nonBlank[0] === 0 && typeof row[0] === 'string'){
@@ -661,11 +660,16 @@ function parseStock(rows){
       const codeStr = String(code).trim();
       if(codeStr === 'Cód.' || codeStr === 'Cód. Prov') continue;
 
-      let valor;
-      if(stockMode === 'disponible') valor = toNum(row[fmt.dispBIdx]) + toNum(row[fmt.dispUIdx]);
-      else if(stockMode === 'deposito') valor = toNum(row[fmt.depBIdx]) + toNum(row[fmt.depUIdx]);
-      else valor = toNum(row[fmt.totBIdx]) + toNum(row[fmt.totUIdx]);
+      // Las columnas Total / Camión / Depósito / Reservado / Disponible p/venta
+      // son siempre los últimos 10 valores de la fila (5 pares Bultos/Unid),
+      // sin importar cuántas columnas en blanco haya antes (varía según el export).
+      const n = row.length;
+      let bIdx, uIdx;
+      if(stockMode === 'disponible')      { bIdx = n-2;  uIdx = n-1; }
+      else if(stockMode === 'deposito')   { bIdx = n-6;  uIdx = n-5; }
+      else /* total */                    { bIdx = n-10; uIdx = n-9; }
 
+      const valor = toNum(row[bIdx]) + toNum(row[uIdx]);
       out.push({ codigo: codeStr, descripcion: String(desc).trim(), proveedor: proveedorActual, stock: valor });
     }
   }
@@ -742,17 +746,14 @@ function renderVendedoresBanner(){
   cont.innerHTML = html;
 }
 
-function detectarColCantVentas(rows){
-  for(let i=0;i<Math.min(rows.length,12);i++){
-    const row = rows[i] || [];
-    const idx = row.findIndex(c => typeof c === 'string' && /^cant\.?$/i.test(c.trim()));
-    if(idx >= 0) return idx + 1;
-  }
-  return 7;
+// Cant. / Capacidad / Costo / Pr.Neto / Pr.Tot son siempre las últimas 5
+// columnas de la fila, sin importar cuántas columnas en blanco haya antes
+// (varía según si el export viene filtrado por proveedor, zona, etc.)
+function detectarColCantVentas(row){
+  return row.length - 5;
 }
 
 function parseVentas(rows){
-  const cantIdx = detectarColCantVentas(rows);
   const out = [];
   let proveedorActual = null;
 
@@ -761,6 +762,7 @@ function parseVentas(rows){
     const codProv = row[0];
     const codInt = row[1];
     const desc = row[2];
+    const cantIdx = detectarColCantVentas(row);
     const cant = row[cantIdx];
 
     if(typeof codProv === 'string' && /total\s*general/i.test(codProv)) continue;
