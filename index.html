@@ -192,9 +192,21 @@ input.comprar-input.tiene-valor{border-color:var(--teal);background:var(--teal-c
           <label class="chk-lbl"><input type="radio" name="modo-carga" value="ambos" checked onchange="onModoChange()"> Ambos depósitos</label>
           <label class="chk-lbl"><input type="radio" name="modo-carga" value="solo_sl" onchange="onModoChange()"> Solo San Luis</label>
           <label class="chk-lbl"><input type="radio" name="modo-carga" value="solo_vm" onchange="onModoChange()"> Solo Villa Mercedes</label>
+          <label class="chk-lbl"><input type="radio" name="modo-carga" value="movimiento" onchange="onModoChange()"> Movimiento entre depósitos</label>
         </div>
       </div>
-      <div class="cfg-note">Elegí "Solo San Luis" o "Solo Villa Mercedes" para trabajar con 2 archivos (stock + ventas de ese depósito) en vez de los 4.</div>
+      <div class="cfg-note">Elegí "Solo San Luis" o "Solo Villa Mercedes" para trabajar con 2 archivos. "Movimiento entre depósitos" te muestra, además, cuánto stock hay en el otro depósito para evaluar transferir en vez de comprar.</div>
+    </div>
+
+    <div class="cfg-row" id="row-destino" style="display:none;border-top:none;padding-top:0;margin-top:0;margin-bottom:4px">
+      <div class="cfg-field" style="width:auto">
+        <label>Depósito que necesita reposición</label>
+        <select id="cfg-destino" onchange="onDestinoChange()" style="width:220px">
+          <option value="sl">San Luis</option>
+          <option value="vm">Villa Mercedes</option>
+        </select>
+      </div>
+      <div class="cfg-note">Subís el stock de <b>ambos</b> depósitos (para ver cuánto hay disponible en el otro) y solo el archivo de ventas del depósito que elegiste acá.</div>
     </div>
 
     <div class="upload-grid">
@@ -233,10 +245,6 @@ input.comprar-input.tiene-valor{border-color:var(--teal);background:var(--teal-c
 
     <div class="cfg-row">
       <div class="cfg-field">
-        <label>Días cubiertos (ventas)</label>
-        <input type="number" id="cfg-dias" value="7" min="1" max="60">
-      </div>
-      <div class="cfg-field">
         <label>Stock a usar</label>
         <select id="cfg-stockcol">
           <option value="disponible" selected>Disponible p/venta</option>
@@ -244,8 +252,8 @@ input.comprar-input.tiene-valor{border-color:var(--teal);background:var(--teal-c
           <option value="deposito">Depósito (incl. reservado)</option>
         </select>
       </div>
-      <div class="cfg-note"><b>Días cubiertos:</b> el rango real que exportaste en los archivos de ventas. Si no son 7 días exactos, se proyecta a 7 días con un promedio diario.</div>
       <div class="cfg-note"><b>Stock a usar:</b> por defecto "Disponible p/venta" (Depósito − Reservado), lo que hoy se puede vender.</div>
+      <div class="cfg-note"><b>Ventas:</b> se toman tal cual figuran en el período del archivo (sin proyectar a 7 días) — fijate el período detectado arriba antes de procesar.</div>
       <div class="spacer"></div>
       <button class="btn btn-teal btn-sm" id="btn-procesar" onclick="iniciarProceso()" disabled>Procesar y guardar ciclo</button>
     </div>
@@ -259,7 +267,7 @@ input.comprar-input.tiene-valor{border-color:var(--teal);background:var(--teal-c
 
     <div class="card">
       <div class="card-tit">Comparativo Stock vs. Ventas</div>
-      <div class="card-sub">Cargá la cantidad a comprar de cada producto en <b>A comprar</b>. Se guarda sola en la base de datos a los pocos segundos de dejar de tipear (mirá el indicador junto al buscador). Filas en rojo: stock igual o menor a lo vendido.</div>
+      <div class="card-sub">Cargá la cantidad a comprar de cada producto en <b>A comprar</b>. Si ya hiciste un pedido a ese proveedor y todavía no te lo entregó, cargalo en <b>Pend. entrega</b> — el "Sugerido" lo descuenta automáticamente. Todo se guarda solo en la base de datos a los pocos segundos de dejar de tipear (mirá el indicador junto al buscador). Filas en rojo: stock igual o menor a lo vendido.</div>
 
       <div class="filter-bar">
         <input type="text" id="f-buscar" placeholder="Buscar por código o descripción…" oninput="renderTabla()">
@@ -278,7 +286,7 @@ input.comprar-input.tiene-valor{border-color:var(--teal);background:var(--teal-c
             <tr class="grp">
               <th class="left" rowspan="2" style="background:var(--azul)">Proveedor / Producto</th>
               <th colspan="3">Stock (u.)</th>
-              <th colspan="3">Ventas · proyectadas (u.)</th>
+              <th colspan="3">Ventas del período (u.)</th>
               <th colspan="3">Diferencia (stock − ventas)</th>
               <th rowspan="2">Precio unit.</th>
               <th rowspan="2">Sugerido</th>
@@ -320,15 +328,17 @@ input.comprar-input.tiene-valor{border-color:var(--teal);background:var(--teal-c
 <div class="toast" id="toast"></div>
 
 <script>
-const API_URL = 'https://script.google.com/macros/s/AKfycbwKFnWIlJXfNK92nOZIrA0wOWSQlWswxyrKt2huSzzjHk0WR1jrAMPlHLLqnLuCtxO4/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwsj_rdaMg-46yDsocpn9lhgVjsWpp6jzuKxXLb9q3TGMDLcTzxGQmUKXH527Re4Rs/exec';
 
 let archivosRaw = { stock_sl: null, stock_vm: null, ventas_sl: null, ventas_vm: null };
 let productos = [];
 let preciosMap = {};
 let preciosArr = [];
 let comprasManual = {};
+let pendientesManual = {};
 let cicloMeta = null;
 let modoActual = 'ambos';
+let destinoActual = 'sl';
 let providerRE = /\bS\.?\s?A\.?\b|\bSRL\b|\bS\.R\.L\.?\b|SOCIEDAD\s+AN[OÓ]NI/i;
 let saveTimer = null;
 
@@ -364,8 +374,13 @@ function cargarEstadoDesdeBackend(){
       productos = data.productos || [];
       cicloMeta = data.meta;
       modoActual = (cicloMeta && cicloMeta.modo) || 'ambos';
+      destinoActual = (cicloMeta && cicloMeta.destino) || 'sl';
       comprasManual = {};
-      productos.forEach(p=>{ if(Number(p.a_comprar)>0) comprasManual[p.codigo] = Number(p.a_comprar); });
+      pendientesManual = {};
+      productos.forEach(p=>{
+        if(Number(p.a_comprar)>0) comprasManual[p.codigo] = Number(p.a_comprar);
+        if(Number(p.pedido_pendiente)>0) pendientesManual[p.codigo] = Number(p.pedido_pendiente);
+      });
       mostrarBannerCargado();
       poblarFiltroProveedor();
       renderThead();
@@ -394,8 +409,12 @@ function mostrarBannerVacio(){
     </div>`;
 }
 function etiquetaModo(m){
-  return m === 'solo_sl' ? 'Solo San Luis' : m === 'solo_vm' ? 'Solo Villa Mercedes' : 'Ambos depósitos';
+  if(m === 'solo_sl') return 'Solo San Luis';
+  if(m === 'solo_vm') return 'Solo Villa Mercedes';
+  if(m === 'movimiento') return 'Movimiento entre depósitos';
+  return 'Ambos depósitos';
 }
+function nombreDeposito(d){ return d === 'vm' ? 'Villa Mercedes' : 'San Luis'; }
 
 function renderThead(){
   const thead = document.getElementById('tabla-thead');
@@ -404,9 +423,10 @@ function renderThead(){
       <tr class="grp">
         <th class="left" rowspan="2" style="background:var(--azul)">Proveedor / Producto</th>
         <th colspan="3">Stock (u.)</th>
-        <th colspan="3">Ventas · proyectadas (u.)</th>
+        <th colspan="3">Ventas del período (u.)</th>
         <th colspan="3">Diferencia (stock − ventas)</th>
         <th rowspan="2">Precio unit.</th>
+        <th rowspan="2">Pend. entrega</th>
         <th rowspan="2">Sugerido</th>
         <th rowspan="2">A comprar</th>
         <th rowspan="2">Estimado $</th>
@@ -416,15 +436,32 @@ function renderThead(){
         <th>SL</th><th>VM</th><th>Total</th>
         <th>SL</th><th>VM</th><th>Total</th>
       </tr>`;
+  } else if(modoActual === 'movimiento'){
+    const destEtq = nombreDeposito(destinoActual);
+    const origEtq = nombreDeposito(destinoActual === 'vm' ? 'sl' : 'vm');
+    thead.innerHTML = `
+      <tr class="grp">
+        <th class="left" style="background:var(--azul)">Proveedor / Producto</th>
+        <th>Stock ${destEtq} (u.)</th>
+        <th>Stock ${origEtq} — para transferir (u.)</th>
+        <th>Ventas ${destEtq} (u.)</th>
+        <th>Diferencia</th>
+        <th>Precio unit.</th>
+        <th>Pend. entrega</th>
+        <th>Sugerido</th>
+        <th>A comprar</th>
+        <th>Estimado $</th>
+      </tr>`;
   } else {
     const etiqueta = modoActual === 'solo_sl' ? 'San Luis' : 'Villa Mercedes';
     thead.innerHTML = `
       <tr class="grp">
         <th class="left" style="background:var(--azul)">Proveedor / Producto</th>
         <th>Stock ${etiqueta} (u.)</th>
-        <th>Ventas proy. (u.)</th>
+        <th>Ventas del período (u.)</th>
         <th>Diferencia</th>
         <th>Precio unit.</th>
+        <th>Pend. entrega</th>
         <th>Sugerido</th>
         <th>A comprar</th>
         <th>Estimado $</th>
@@ -436,18 +473,23 @@ function mostrarBannerCargado(){
   const fecha = new Date(cicloMeta.fecha_carga).toLocaleString('es-AR');
   const periodoTxt = (cicloMeta.periodoInicio && cicloMeta.periodoFin)
     ? `<span class="periodo-chip">${cicloMeta.periodoInicio} → ${cicloMeta.periodoFin}</span> ` : '';
+  const alcanceTxt = (modoActual === 'movimiento')
+    ? `Movimiento entre depósitos — reponiendo <b>${nombreDeposito(destinoActual)}</b> retirando de <b>${nombreDeposito(destinoActual==='vm'?'sl':'vm')}</b>`
+    : etiquetaModo(modoActual);
   document.getElementById('banner-estado').innerHTML = `
     <div class="banner ok">
       <div class="b-icon">📅</div>
-      <div class="b-text"><b>Ciclo cargado el ${fecha}</b> · <b>${etiquetaModo(modoActual)}</b><br>Ventas del período ${periodoTxt}· proyectado a 7 días (base: ${cicloMeta.dias} días) · stock: ${etiquetaStockMode(cicloMeta.stockMode)}.</div>
+      <div class="b-text"><b>Ciclo cargado el ${fecha}</b> · <b>${alcanceTxt}</b><br>Ventas del período ${periodoTxt}(reales, sin proyectar) · stock: ${etiquetaStockMode(cicloMeta.stockMode)}.</div>
       <div class="b-actions"><button class="btn btn-white btn-sm" onclick="mostrarCargaManual()">↺ Cargar archivos nuevos</button></div>
     </div>`;
 
   let vendHtml = '';
-  if(modoActual !== 'solo_vm' && cicloMeta.vendedoresSL){
+  const mostrarSL = modoActual !== 'solo_vm' && !(modoActual==='movimiento' && destinoActual==='vm');
+  const mostrarVM = modoActual !== 'solo_sl' && !(modoActual==='movimiento' && destinoActual==='sl');
+  if(mostrarSL && cicloMeta.vendedoresSL){
     vendHtml += `<div class="banner info" style="margin-top:10px"><div class="b-icon">🧑‍💼</div><div class="b-text"><b>Vendedores incluidos — San Luis:</b> ${formatVendedores(cicloMeta.vendedoresSL.split(',').filter(Boolean))}</div></div>`;
   }
-  if(modoActual !== 'solo_sl' && cicloMeta.vendedoresVM){
+  if(mostrarVM && cicloMeta.vendedoresVM){
     vendHtml += `<div class="banner info" style="margin-top:10px"><div class="b-icon">🧑‍💼</div><div class="b-text"><b>Vendedores incluidos — Villa Mercedes:</b> ${formatVendedores(cicloMeta.vendedoresVM.split(',').filter(Boolean))}</div></div>`;
   }
   document.getElementById('banner-estado').innerHTML += vendHtml;
@@ -485,29 +527,29 @@ function showToast(msg, isErr){
 
 function renderPeriodoBanner(){
   const cont = document.getElementById('periodo-banner');
-  const modo = getModoCarga();
+  let modo = getModoCarga();
   const pSL = archivosRaw.ventas_sl && archivosRaw.ventas_sl.periodo;
   const pVM = archivosRaw.ventas_vm && archivosRaw.ventas_vm.periodo;
+
+  if(modo === 'movimiento') modo = (getDestino() === 'sl') ? 'solo_sl' : 'solo_vm';
 
   if(modo === 'solo_sl'){
     if(!archivosRaw.ventas_sl){ cont.innerHTML = ''; return; }
     if(!pSL){
-      cont.innerHTML = `<div class="banner warn" style="margin-bottom:0;margin-top:14px"><div class="b-icon">⚠️</div><div class="b-text">No pudimos detectar el período de ventas en el archivo de <b>San Luis</b>. Confirmá manualmente el campo "Días cubiertos".</div></div>`;
+      cont.innerHTML = `<div class="banner warn" style="margin-bottom:0;margin-top:14px"><div class="b-icon">⚠️</div><div class="b-text">No pudimos detectar el período de ventas en el archivo de <b>San Luis</b>. Las ventas se van a tomar igual tal cual figuran en el archivo, pero no vamos a poder mostrarte de qué período son.</div></div>`;
       return;
     }
-    cont.innerHTML = `<div class="banner ok" style="margin-bottom:0;margin-top:14px"><div class="b-icon">📅</div><div class="b-text">Período de ventas (San Luis): <span class="periodo-chip">${pSL.inicioStr} → ${pSL.finStr}</span> · <b>${pSL.dias} días</b>.</div></div>`;
-    document.getElementById('cfg-dias').value = pSL.dias;
+    cont.innerHTML = `<div class="banner ok" style="margin-bottom:0;margin-top:14px"><div class="b-icon">📅</div><div class="b-text">Período de ventas (San Luis): <span class="periodo-chip">${pSL.inicioStr} → ${pSL.finStr}</span> · ${pSL.dias} días.</div></div>`;
     return;
   }
 
   if(modo === 'solo_vm'){
     if(!archivosRaw.ventas_vm){ cont.innerHTML = ''; return; }
     if(!pVM){
-      cont.innerHTML = `<div class="banner warn" style="margin-bottom:0;margin-top:14px"><div class="b-icon">⚠️</div><div class="b-text">No pudimos detectar el período de ventas en el archivo de <b>Villa Mercedes</b>. Confirmá manualmente el campo "Días cubiertos".</div></div>`;
+      cont.innerHTML = `<div class="banner warn" style="margin-bottom:0;margin-top:14px"><div class="b-icon">⚠️</div><div class="b-text">No pudimos detectar el período de ventas en el archivo de <b>Villa Mercedes</b>. Las ventas se van a tomar igual tal cual figuran en el archivo, pero no vamos a poder mostrarte de qué período son.</div></div>`;
       return;
     }
-    cont.innerHTML = `<div class="banner ok" style="margin-bottom:0;margin-top:14px"><div class="b-icon">📅</div><div class="b-text">Período de ventas (Villa Mercedes): <span class="periodo-chip">${pVM.inicioStr} → ${pVM.finStr}</span> · <b>${pVM.dias} días</b>.</div></div>`;
-    document.getElementById('cfg-dias').value = pVM.dias;
+    cont.innerHTML = `<div class="banner ok" style="margin-bottom:0;margin-top:14px"><div class="b-icon">📅</div><div class="b-text">Período de ventas (Villa Mercedes): <span class="periodo-chip">${pVM.inicioStr} → ${pVM.finStr}</span> · ${pVM.dias} días.</div></div>`;
     return;
   }
 
@@ -521,7 +563,7 @@ function renderPeriodoBanner(){
     const cuales = [faltaSL?'San Luis':null, faltaVM?'Villa Mercedes':null].filter(Boolean).join(' y ');
     cont.innerHTML = `<div class="banner warn" style="margin-bottom:0;margin-top:14px">
       <div class="b-icon">⚠️</div>
-      <div class="b-text">No pudimos detectar automáticamente el período de ventas en el archivo de <b>${cuales}</b>. Revisá que sea un export de Axum sin modificar, y confirmá manualmente el campo "Días cubiertos" antes de procesar.</div>
+      <div class="b-text">No pudimos detectar automáticamente el período de ventas en el archivo de <b>${cuales}</b>. Revisá que sea un export de Axum sin modificar. Las ventas se toman igual tal cual figuran en el archivo.</div>
     </div>`;
     return;
   }
@@ -531,16 +573,15 @@ function renderPeriodoBanner(){
     if(coincide){
       cont.innerHTML = `<div class="banner ok" style="margin-bottom:0;margin-top:14px">
         <div class="b-icon">📅</div>
-        <div class="b-text">Período de ventas detectado: <span class="periodo-chip">${pSL.inicioStr} → ${pSL.finStr}</span> · <b>${pSL.dias} días</b> — coincide en San Luis y Villa Mercedes.</div>
+        <div class="b-text">Período de ventas detectado: <span class="periodo-chip">${pSL.inicioStr} → ${pSL.finStr}</span> · ${pSL.dias} días — coincide en San Luis y Villa Mercedes.</div>
       </div>`;
-      document.getElementById('cfg-dias').value = pSL.dias;
     } else {
       cont.innerHTML = `<div class="banner err" style="margin-bottom:0;margin-top:14px">
         <div class="b-icon">🚨</div>
         <div class="b-text"><b>Los archivos de ventas NO cubren el mismo período.</b><br>
         San Luis: <span class="periodo-chip">${pSL.inicioStr} → ${pSL.finStr} · ${pSL.dias}d</span>
         Villa Mercedes: <span class="periodo-chip">${pVM.inicioStr} → ${pVM.finStr} · ${pVM.dias}d</span><br>
-        Revisá los exports antes de continuar — comparar períodos distintos entre depósitos puede distorsionar las alertas de quiebre.</div>
+        Revisá los exports antes de continuar — comparar períodos distintos entre depósitos puede hacer que las ventas de un depósito pesen más que las del otro sin que se note.</div>
       </div>`;
     }
     return;
@@ -559,12 +600,21 @@ function getModoCarga(){
   return el ? el.value : 'ambos';
 }
 
+function getDestino(){
+  const el = document.getElementById('cfg-destino');
+  return el ? el.value : 'sl';
+}
+
 function actualizarBotonProcesar(){
   const modo = getModoCarga();
   let listo;
   if(modo === 'ambos') listo = archivosRaw.stock_sl && archivosRaw.stock_vm && archivosRaw.ventas_sl && archivosRaw.ventas_vm;
   else if(modo === 'solo_sl') listo = archivosRaw.stock_sl && archivosRaw.ventas_sl;
-  else listo = archivosRaw.stock_vm && archivosRaw.ventas_vm;
+  else if(modo === 'solo_vm') listo = archivosRaw.stock_vm && archivosRaw.ventas_vm;
+  else { // movimiento
+    const destino = getDestino();
+    listo = archivosRaw.stock_sl && archivosRaw.stock_vm && archivosRaw['ventas_'+destino];
+  }
   document.getElementById('btn-procesar').disabled = !listo;
 }
 
@@ -576,14 +626,37 @@ function limpiarCasillero(key){
 
 function onModoChange(){
   const modo = getModoCarga();
-  const showSL = modo === 'ambos' || modo === 'solo_sl';
-  const showVM = modo === 'ambos' || modo === 'solo_vm';
-  document.getElementById('box-stock_sl').style.display = showSL ? '' : 'none';
-  document.getElementById('box-ventas_sl').style.display = showSL ? '' : 'none';
-  document.getElementById('box-stock_vm').style.display = showVM ? '' : 'none';
-  document.getElementById('box-ventas_vm').style.display = showVM ? '' : 'none';
-  if(!showSL){ limpiarCasillero('stock_sl'); limpiarCasillero('ventas_sl'); }
-  if(!showVM){ limpiarCasillero('stock_vm'); limpiarCasillero('ventas_vm'); }
+  document.getElementById('row-destino').style.display = (modo === 'movimiento') ? '' : 'none';
+
+  if(modo === 'movimiento'){
+    document.getElementById('box-stock_sl').style.display = '';
+    document.getElementById('box-stock_vm').style.display = '';
+    aplicarVisibilidadVentasMovimiento();
+  } else {
+    const showSL = modo === 'ambos' || modo === 'solo_sl';
+    const showVM = modo === 'ambos' || modo === 'solo_vm';
+    document.getElementById('box-stock_sl').style.display = showSL ? '' : 'none';
+    document.getElementById('box-ventas_sl').style.display = showSL ? '' : 'none';
+    document.getElementById('box-stock_vm').style.display = showVM ? '' : 'none';
+    document.getElementById('box-ventas_vm').style.display = showVM ? '' : 'none';
+    if(!showSL){ limpiarCasillero('stock_sl'); limpiarCasillero('ventas_sl'); }
+    if(!showVM){ limpiarCasillero('stock_vm'); limpiarCasillero('ventas_vm'); }
+  }
+  actualizarBotonProcesar();
+  renderPeriodoBanner();
+  renderVendedoresBanner();
+}
+
+function aplicarVisibilidadVentasMovimiento(){
+  const destino = getDestino();
+  document.getElementById('box-ventas_sl').style.display = (destino === 'sl') ? '' : 'none';
+  document.getElementById('box-ventas_vm').style.display = (destino === 'vm') ? '' : 'none';
+  if(destino !== 'sl') limpiarCasillero('ventas_sl');
+  if(destino !== 'vm') limpiarCasillero('ventas_vm');
+}
+
+function onDestinoChange(){
+  aplicarVisibilidadVentasMovimiento();
   actualizarBotonProcesar();
   renderPeriodoBanner();
   renderVendedoresBanner();
@@ -733,14 +806,17 @@ function formatVendedores(codigos, plano){
 function renderVendedoresBanner(){
   const cont = document.getElementById('vendedores-banner');
   const modo = getModoCarga();
+  const destino = getDestino();
   const vSL = archivosRaw.ventas_sl && archivosRaw.ventas_sl.vendedores;
   const vVM = archivosRaw.ventas_vm && archivosRaw.ventas_vm.vendedores;
 
   let html = '';
-  if((modo === 'ambos' || modo === 'solo_sl') && archivosRaw.ventas_sl){
+  const mostrarSL = modo === 'ambos' || modo === 'solo_sl' || (modo === 'movimiento' && destino === 'sl');
+  const mostrarVM = modo === 'ambos' || modo === 'solo_vm' || (modo === 'movimiento' && destino === 'vm');
+  if(mostrarSL && archivosRaw.ventas_sl){
     html += `<div class="banner info" style="margin-bottom:0;margin-top:10px"><div class="b-icon">🧑‍💼</div><div class="b-text"><b>Vendedores incluidos — San Luis:</b> ${vSL ? formatVendedores(vSL) : '⚠️ no se pudo detectar en el archivo'}</div></div>`;
   }
-  if((modo === 'ambos' || modo === 'solo_vm') && archivosRaw.ventas_vm){
+  if(mostrarVM && archivosRaw.ventas_vm){
     html += `<div class="banner info" style="margin-bottom:0;margin-top:10px"><div class="b-icon">🧑‍💼</div><div class="b-text"><b>Vendedores incluidos — Villa Mercedes:</b> ${vVM ? formatVendedores(vVM) : '⚠️ no se pudo detectar en el archivo'}</div></div>`;
   }
   cont.innerHTML = html;
@@ -785,13 +861,11 @@ function parseVentas(rows){
 
 function construirDataset(){
   const modo = getModoCarga();
+  const destino = getDestino();
   const stockSL = archivosRaw.stock_sl ? parseStock(archivosRaw.stock_sl.rows) : [];
   const stockVM = archivosRaw.stock_vm ? parseStock(archivosRaw.stock_vm.rows) : [];
   const ventasSL = archivosRaw.ventas_sl ? parseVentas(archivosRaw.ventas_sl.rows) : [];
   const ventasVM = archivosRaw.ventas_vm ? parseVentas(archivosRaw.ventas_vm.rows) : [];
-
-  const dias = parseFloat(document.getElementById('cfg-dias').value) || 7;
-  const factorProy = 7 / dias;
 
   const stockSLMap = {}; stockSL.forEach(p=>stockSLMap[p.codigo]=p);
   const stockVMMap = {}; stockVM.forEach(p=>stockVMMap[p.codigo]=p);
@@ -810,25 +884,28 @@ function construirDataset(){
     const sSL = stockSLMap[codigo]; const sVM = stockVMMap[codigo];
     const stockSLv = sSL ? sSL.stock : 0;
     const stockVMv = sVM ? sVM.stock : 0;
-    const ventasSLraw = ventasSLMap[codigo] || 0;
-    const ventasVMraw = ventasVMMap[codigo] || 0;
-    const ventasSLv = ventasSLraw * factorProy;
-    const ventasVMv = ventasVMraw * factorProy;
+    // Ventas reales del período cargado — sin proyectar ni escalar por días.
+    const ventasSLv = ventasSLMap[codigo] || 0;
+    const ventasVMv = ventasVMMap[codigo] || 0;
 
     const descripcion = (sSL && sSL.descripcion) || (sVM && sVM.descripcion) ||
                          (ventasSL.find(p=>p.codigo===codigo)||{}).descripcion ||
                          (ventasVM.find(p=>p.codigo===codigo)||{}).descripcion || '(sin descripción)';
     const proveedor = (sSL && sSL.proveedor) || (sVM && sVM.proveedor) || ventasSLProv[codigo] || ventasVMProv[codigo] || 'Sin proveedor asignado';
 
-    const stockTotal = stockSLv + stockVMv;
+    // En "movimiento", stock_total/ventas_total representan solo el depósito
+    // destino (el que necesita reposición) — el otro stock queda disponible
+    // en stock_sl/stock_vm para mostrarlo como referencia de transferencia,
+    // pero no se suma a la diferencia ni a la alerta.
+    const stockTotal = (modo === 'movimiento') ? (destino === 'sl' ? stockSLv : stockVMv) : (stockSLv + stockVMv);
     const ventasTotal = ventasSLv + ventasVMv;
     const diffSL = stockSLv - ventasSLv;
     const diffVM = stockVMv - ventasVMv;
     const diffTotal = stockTotal - ventasTotal;
 
-    const alerta = (ventasSLraw > 0 && stockSLv <= ventasSLv) ||
-                   (ventasVMraw > 0 && stockVMv <= ventasVMv) ||
-                   ((ventasSLraw+ventasVMraw) > 0 && stockTotal <= ventasTotal);
+    const alerta = (ventasSLv > 0 && stockSLv <= ventasSLv) ||
+                   (ventasVMv > 0 && stockVMv <= ventasVMv) ||
+                   (ventasTotal > 0 && stockTotal <= ventasTotal);
 
     const sugerido = Math.max(0, Math.ceil(ventasTotal - stockTotal));
 
@@ -837,7 +914,7 @@ function construirDataset(){
       stock_sl: stockSLv, stock_vm: stockVMv, stock_total: stockTotal,
       ventas_sl: ventasSLv, ventas_vm: ventasVMv, ventas_total: ventasTotal,
       diff_sl: diffSL, diff_vm: diffVM, diff_total: diffTotal,
-      alerta, sugerido, a_comprar: 0
+      alerta, sugerido, a_comprar: 0, pedido_pendiente: 0
     });
   });
 
@@ -850,32 +927,31 @@ function construirDataset(){
   const vendedoresVM = (archivosRaw.ventas_vm && archivosRaw.ventas_vm.vendedores) ? archivosRaw.ventas_vm.vendedores.join(',') : '';
 
   return {
-    productos: out, dias, stockMode: document.getElementById('cfg-stockcol').value,
+    productos: out, dias: periodoRef ? periodoRef.dias : '', stockMode: document.getElementById('cfg-stockcol').value,
     periodoInicio: periodoRef ? periodoRef.inicioStr : '',
     periodoFin: periodoRef ? periodoRef.finStr : '',
     vendedoresSL, vendedoresVM,
-    modo
+    modo, destino: (modo === 'movimiento') ? destino : ''
   };
 }
 
 function iniciarProceso(){
   const modo = getModoCarga();
-  const dias = document.getElementById('cfg-dias').value;
 
   if(modo === 'ambos'){
     const pSL = archivosRaw.ventas_sl && archivosRaw.ventas_sl.periodo;
     const pVM = archivosRaw.ventas_vm && archivosRaw.ventas_vm.periodo;
     if(!pSL || !pVM){
-      if(!confirm(`No pudimos detectar el período de ventas en uno de los dos archivos.\n\n¿Confirmás que el archivo realmente cubre ${dias} día(s), como está puesto en "Días cubiertos"?`)) return;
+      if(!confirm(`No pudimos detectar el período de ventas en uno de los dos archivos.\n\nLas ventas se van a cargar igual, tal cual figuran en cada archivo. ¿Confirmás que querés continuar?`)) return;
     } else if(pSL.inicioStr !== pVM.inicioStr || pSL.finStr !== pVM.finStr){
       if(!confirm(`Los archivos de ventas cubren períodos DISTINTOS:\n\nSan Luis: ${pSL.inicioStr} → ${pSL.finStr} (${pSL.dias} días)\nVilla Mercedes: ${pVM.inicioStr} → ${pVM.finStr} (${pVM.dias} días)\n\n¿Confirmás que querés continuar de todas formas?`)) return;
     }
   } else {
-    const key = modo === 'solo_sl' ? 'ventas_sl' : 'ventas_vm';
-    const cual = modo === 'solo_sl' ? 'San Luis' : 'Villa Mercedes';
+    const key = modo === 'movimiento' ? ('ventas_' + getDestino()) : (modo === 'solo_sl' ? 'ventas_sl' : 'ventas_vm');
+    const cual = (modo === 'movimiento' ? getDestino() : modo.replace('solo_','')) === 'sl' ? 'San Luis' : 'Villa Mercedes';
     const p = archivosRaw[key] && archivosRaw[key].periodo;
     if(!p){
-      if(!confirm(`No pudimos detectar el período de ventas del archivo de ${cual}.\n\n¿Confirmás que el archivo realmente cubre ${dias} día(s), como está puesto en "Días cubiertos"?`)) return;
+      if(!confirm(`No pudimos detectar el período de ventas del archivo de ${cual}.\n\nLas ventas se van a cargar igual, tal cual figuran en el archivo. ¿Confirmás que querés continuar?`)) return;
     }
   }
   procesarYSubir(false);
@@ -895,7 +971,7 @@ function procesarYSubir(force){
   document.getElementById('parse-status').innerHTML = `Procesados ${ds.productos.length} productos. Guardando en la base de datos…`;
 
   apiPost({ action:'cargar', force: !!force, dias: ds.dias, stockMode: ds.stockMode,
-            periodoInicio: ds.periodoInicio, periodoFin: ds.periodoFin, modo: ds.modo,
+            periodoInicio: ds.periodoInicio, periodoFin: ds.periodoFin, modo: ds.modo, destino: ds.destino,
             vendedoresSL: ds.vendedoresSL, vendedoresVM: ds.vendedoresVM, productos: ds.productos })
     .then(res=>{
       if(res.requiereConfirmacion){
@@ -918,6 +994,7 @@ function procesarYSubir(force){
         document.getElementById('periodo-banner').innerHTML = '';
         document.getElementById('vendedores-banner').innerHTML = '';
         document.querySelector('input[name="modo-carga"][value="ambos"]').checked = true;
+        document.getElementById('cfg-destino').value = 'sl';
         onModoChange();
         btn.disabled = true; btn.textContent = 'Procesar y guardar ciclo';
         document.getElementById('parse-status').innerHTML = '';
@@ -962,6 +1039,11 @@ function poblarFiltroProveedor(){
   sel.innerHTML = '<option value="">Todos los proveedores</option>' + provs.map(p=>`<option value="${escHtml(p)}">${escHtml(p)}</option>`).join('');
 }
 
+function calcularSugerido(p){
+  const pendiente = toNum(pendientesManual[p.codigo]);
+  return Math.max(0, Math.ceil(p.ventas_total - p.stock_total - pendiente));
+}
+
 function renderTabla(){
   const buscar = document.getElementById('f-buscar').value.trim().toLowerCase();
   const provFiltro = document.getElementById('f-proveedor').value;
@@ -980,7 +1062,7 @@ function renderTabla(){
 
   document.getElementById('count-pill').textContent = filtrados.length + ' productos';
 
-  const colspanVacio = modoActual === 'ambos' ? 14 : 8;
+  const colspanVacio = modoActual === 'ambos' ? 15 : (modoActual === 'movimiento' ? 10 : 9);
   const body = document.getElementById('tbl-body');
   if(filtrados.length===0){
     body.innerHTML = `<tr><td colspan="${colspanVacio}"><div class="empty-state"><div class="ico">🔍</div>No hay productos que coincidan con los filtros.</div></td></tr>`;
@@ -993,11 +1075,16 @@ function renderTabla(){
     const cls = p.alerta ? 'alerta' : (toNum(p.stock_total)===0 && toNum(p.ventas_total)===0 ? 'sin-mov' : '');
     const valCompra = comprasManual[p.codigo] !== undefined ? comprasManual[p.codigo] : '';
     const tieneValor = toNum(valCompra) > 0;
+    const valPendiente = pendientesManual[p.codigo] !== undefined ? pendientesManual[p.codigo] : '';
+    const tienePendiente = toNum(valPendiente) > 0;
     const precio = preciosMap[p.codigo];
     const estimado = precio ? precio * toNum(valCompra) : null;
-    const inputHtml = `<input type="number" min="0" step="1" class="comprar-input ${tieneValor?'tiene-valor':''}"
+    const inputCompra = `<input type="number" min="0" step="1" class="comprar-input ${tieneValor?'tiene-valor':''}"
              value="${valCompra}" placeholder="0"
              onchange="setCompra('${String(p.codigo).replace(/'/g,"\\'")}', this.value, this)">`;
+    const inputPendiente = `<input type="number" min="0" step="1" class="comprar-input ${tienePendiente?'tiene-valor':''}"
+             value="${valPendiente}" placeholder="0"
+             onchange="setPendiente('${String(p.codigo).replace(/'/g,"\\'")}', this.value, this)">`;
     const celdaProducto = `<td class="left">
         ${p.proveedor !== provAnterior ? `<div class="prov-tag">${escHtml(p.proveedor)}</div>` : ''}
         <div class="desc-txt">${escHtml(p.descripcion)}${p.alerta?'<span class="badge-alerta">ALERTA</span>':''}</div>
@@ -1013,8 +1100,24 @@ function renderTabla(){
         <td class="${p.diff_vm<0?'neg':'pos'}">${fmt(p.diff_vm)}</td>
         <td class="${p.diff_total<0?'neg':'pos'}"><b>${fmt(p.diff_total)}</b></td>
         <td class="precio-txt ${precio?'':'sinprecio'}">${precio?fmtMoney(precio):'sin precio'}</td>
-        <td class="sug-txt">${p.sugerido>0?fmt(p.sugerido):'—'}</td>
-        <td>${inputHtml}</td>
+        <td>${inputPendiente}</td>
+        <td class="sug-txt">${(() => { const s = calcularSugerido(p); return s>0?fmt(s):'—'; })()}</td>
+        <td>${inputCompra}</td>
+        <td class="estimado-txt">${estimado!==null && estimado>0 ? fmtMoney(estimado) : '—'}</td>
+      </tr>`;
+    } else if(modoActual === 'movimiento'){
+      const stockDestino = destinoActual === 'vm' ? p.stock_vm : p.stock_sl;
+      const stockOrigen = destinoActual === 'vm' ? p.stock_sl : p.stock_vm;
+      html += `<tr class="${cls}">
+        ${celdaProducto}
+        <td><b>${fmt(stockDestino)}</b></td>
+        <td class="pos">${fmt(stockOrigen)}</td>
+        <td><b>${fmt(p.ventas_total)}</b></td>
+        <td class="${p.diff_total<0?'neg':'pos'}"><b>${fmt(p.diff_total)}</b></td>
+        <td class="precio-txt ${precio?'':'sinprecio'}">${precio?fmtMoney(precio):'sin precio'}</td>
+        <td>${inputPendiente}</td>
+        <td class="sug-txt">${(() => { const s = calcularSugerido(p); return s>0?fmt(s):'—'; })()}</td>
+        <td>${inputCompra}</td>
         <td class="estimado-txt">${estimado!==null && estimado>0 ? fmtMoney(estimado) : '—'}</td>
       </tr>`;
     } else {
@@ -1024,8 +1127,9 @@ function renderTabla(){
         <td><b>${fmt(p.ventas_total)}</b></td>
         <td class="${p.diff_total<0?'neg':'pos'}"><b>${fmt(p.diff_total)}</b></td>
         <td class="precio-txt ${precio?'':'sinprecio'}">${precio?fmtMoney(precio):'sin precio'}</td>
-        <td class="sug-txt">${p.sugerido>0?fmt(p.sugerido):'—'}</td>
-        <td>${inputHtml}</td>
+        <td>${inputPendiente}</td>
+        <td class="sug-txt">${(() => { const s = calcularSugerido(p); return s>0?fmt(s):'—'; })()}</td>
+        <td>${inputCompra}</td>
         <td class="estimado-txt">${estimado!==null && estimado>0 ? fmtMoney(estimado) : '—'}</td>
       </tr>`;
     }
@@ -1045,6 +1149,16 @@ function setCompra(codigo, valor, el){
   programarGuardado();
 }
 
+function setPendiente(codigo, valor, el){
+  const n = toNum(valor);
+  if(n > 0){ pendientesManual[codigo] = n; el.classList.add('tiene-valor'); }
+  else { delete pendientesManual[codigo]; el.classList.remove('tiene-valor'); }
+  const prod = productos.find(p=>p.codigo===codigo);
+  if(prod) prod.pedido_pendiente = n;
+  renderTabla();
+  programarGuardado();
+}
+
 function programarGuardado(){
   const pill = document.getElementById('save-pill');
   pill.className = 'save-pill saving'; pill.textContent = 'guardando…';
@@ -1053,7 +1167,7 @@ function programarGuardado(){
 }
 function guardarComprasEnBackend(){
   const pill = document.getElementById('save-pill');
-  apiPost({ action:'guardarCompras', compras: comprasManual })
+  apiPost({ action:'guardarCompras', compras: comprasManual, pendientes: pendientesManual })
     .then(res=>{
       if(res.ok){ pill.className='save-pill saved'; pill.textContent='guardado ✓ ' + new Date(res.guardado).toLocaleTimeString('es-AR'); }
       else { pill.className='save-pill error'; pill.textContent='error al guardar'; }
@@ -1077,7 +1191,7 @@ function confirmarGenerarYLimpiar(){
   apiPost({ action:'limpiar' }).then(res=>{
     if(res.ok){
       showToast('Pedido generado y ciclo limpiado ✓');
-      productos = []; comprasManual = {};
+      productos = []; comprasManual = {}; pendientesManual = {};
       cargarEstadoDesdeBackend();
     } else {
       showToast('El Excel se generó, pero no se pudo limpiar el ciclo: ' + (res.error||''), true);
@@ -1100,7 +1214,7 @@ function exportarPedidos(items){
     ['Pedidos de Compra — Congelados Puntanos'],
     ['Generado: ' + new Date().toLocaleString('es-AR')],
     ['Ciclo cargado: ' + (cicloMeta ? new Date(cicloMeta.fecha_carga).toLocaleString('es-AR') : '')],
-    ['Alcance: ' + etiquetaModo(modoActual)],
+    ['Alcance: ' + (modoActual==='movimiento' ? `Movimiento entre depósitos — reponiendo ${nombreDeposito(destinoActual)} retirando de ${nombreDeposito(destinoActual==='vm'?'sl':'vm')}` : etiquetaModo(modoActual))],
     ['Período de ventas: ' + (cicloMeta && cicloMeta.periodoInicio ? `${cicloMeta.periodoInicio} → ${cicloMeta.periodoFin}` : `(no detectado — base ${cicloMeta?cicloMeta.dias:''} días)`)],
     ['Vendedores San Luis: ' + (cicloMeta && cicloMeta.vendedoresSL ? formatVendedores(cicloMeta.vendedoresSL.split(',').filter(Boolean), true) : '—')],
     ['Vendedores Villa Mercedes: ' + (cicloMeta && cicloMeta.vendedoresVM ? formatVendedores(cicloMeta.vendedoresVM.split(',').filter(Boolean), true) : '—')],
@@ -1127,17 +1241,18 @@ function exportarPedidos(items){
       ['Pedido de Compra — ' + prov],
       ['Generado: ' + new Date().toLocaleString('es-AR')],
       [],
-      ['Código', 'Descripción', 'Stock SL', 'Stock VM', 'Stock Total', 'Ventas Total (proy.)', 'Precio unit.', 'Cantidad a Comprar', 'Estimado $']
+      ['Código', 'Descripción', 'Stock SL', 'Stock VM', 'Stock Total', 'Ventas Total (período)', 'Pend. entrega', 'Precio unit.', 'Cantidad a Comprar', 'Estimado $']
     ];
     arr.sort((a,b)=>a.descripcion.localeCompare(b.descripcion));
     arr.forEach(p=>{
       const cant = toNum(comprasManual[p.codigo]);
+      const pendiente = toNum(pendientesManual[p.codigo]);
       const precio = preciosMap[p.codigo] || '';
       aoa.push([p.codigo, p.descripcion, Math.round(p.stock_sl*100)/100, Math.round(p.stock_vm*100)/100,
-                Math.round(p.stock_total*100)/100, Math.round(p.ventas_total*100)/100, precio, cant, precio?precio*cant:'']);
+                Math.round(p.stock_total*100)/100, Math.round(p.ventas_total*100)/100, pendiente||'', precio, cant, precio?precio*cant:'']);
     });
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{wch:12},{wch:42},{wch:10},{wch:10},{wch:12},{wch:16},{wch:12},{wch:14},{wch:14}];
+    ws['!cols'] = [{wch:12},{wch:42},{wch:10},{wch:10},{wch:12},{wch:16},{wch:12},{wch:12},{wch:14},{wch:14}];
     let sheetName = prov.replace(/[\\\/\?\*\[\]:]/g,'').substring(0,31) || 'Proveedor';
     let base = sheetName, i2 = 1;
     while(wb.SheetNames.includes(sheetName)){ sheetName = (base.substring(0,28) + '_' + (++i2)); }
@@ -1262,10 +1377,13 @@ function abrirHistorial(){
       const fechaCarga = h.fecha_carga ? new Date(h.fecha_carga).toLocaleString('es-AR') : '—';
       const fechaPedido = h.fecha_pedido ? new Date(h.fecha_pedido).toLocaleString('es-AR') : '—';
       const estadoCls = h.estado==='Cerrado' ? 'cerrado' : 'en-proceso';
-      const periodo = (h.periodo_inicio && h.periodo_fin) ? `${h.periodo_inicio} → ${h.periodo_fin} (${h.dias_cubiertos}d)` : `${h.dias_cubiertos}d (sin detectar)`;
+      const periodo = (h.periodo_inicio && h.periodo_fin) ? `${h.periodo_inicio} → ${h.periodo_fin} (${h.dias_cubiertos}d)` : `(período no detectado)`;
+      const alcance = (h.modo === 'movimiento')
+        ? `Movimiento → ${nombreDeposito(h.destino || 'sl')} (de ${nombreDeposito((h.destino||'sl')==='vm'?'sl':'vm')})`
+        : etiquetaModo(h.modo || 'ambos');
       html += `<tr>
         <td>${fechaCarga}</td>
-        <td>${etiquetaModo(h.modo || 'ambos')}</td>
+        <td>${alcance}</td>
         <td>${periodo}</td>
         <td><span class="estado-chip ${estadoCls}">${escHtml(h.estado)}</span></td>
         <td>${h.cantidad_productos}</td>
