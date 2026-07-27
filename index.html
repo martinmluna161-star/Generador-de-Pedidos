@@ -829,9 +829,28 @@ function detectarColCantVentas(row){
   return row.length - 5;
 }
 
+// Cuando el export de ventas viene filtrado a un solo proveedor, Axum no
+// repite el nombre del proveedor como fila propia en ningún lado — solo
+// aparece en el texto del filtro ("... / prove = BOGS S.A. / ..."). En los
+// exports multi-proveedor ese filtro es "prove en (códigos)" y esto no matchea,
+// así que no interfiere con la detección fila por fila de esos archivos.
+function detectarProveedorFiltroVentas(rows){
+  const re = /prove\s*=\s*([^\/]+)/i;
+  for(let i=0;i<Math.min(rows.length,10);i++){
+    const row = rows[i] || [];
+    for(const cell of row){
+      if(typeof cell === 'string'){
+        const m = cell.match(re);
+        if(m) return m[1].trim();
+      }
+    }
+  }
+  return null;
+}
+
 function parseVentas(rows){
   const out = [];
-  let proveedorActual = null;
+  let proveedorActual = detectarProveedorFiltroVentas(rows);
 
   for(const rawRow of rows){
     const row = rawRow || [];
