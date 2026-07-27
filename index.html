@@ -695,20 +695,44 @@ function onFile(evt, key){
   reader.readAsArrayBuffer(file);
 }
 
-function detectarFormatoStock(rows){
-  let tieneCodProv = false;
-  for(let i=0;i<Math.min(rows.length,15);i++){
-    const row = rows[i] || [];
-    for(const cell of row){
-      if(typeof cell === 'string' && /c[oó]d\.?\s*prov/i.test(cell)){ tieneCodProv = true; break; }
-    }
-    if(tieneCodProv) break;
+// La Descripción está en la columna 2 cuando la fila trae "Cód. Prov" (un
+// código numérico) en la columna 1; pero hay productos puntuales donde ese
+// código viene vacío en origen, y ahí la Descripción "sube" directamente a
+// la columna 1. Lo detectamos por fila (no por archivo completo) mirando si
+// la columna 1 es un código (solo dígitos) o ya es texto descriptivo.
+function obtenerDescStock(row){
+  const v1 = row[1];
+  if(isBlank(v1)) return row[2];
+  if(typeof v1 === 'number') return row[2];
+  if(typeof v1 === 'string' && /^\d+$/.test(v1.trim())) return row[2];
+  return v1; // ya es texto real -> esta es la descripción
+}
+
+// Total / Camión / Depósito / Reservado / Disponible p/venta son, en el caso
+// normal, los últimos 10 valores de la fila (5 pares Bultos/Unid o
+// valor+etiqueta de unidad como "Kgs."/"Hormas"). Pero algunos productos
+// (típicamente los que no tienen Cód. Prov cargado) vienen sin la etiqueta
+// de unidad final, dejando celdas realmente vacías al final de la fila; en
+// ese caso Depósito/Reservado/Disponible son valores únicos (no pares),
+// ubicados justo antes de ese relleno en blanco.
+function extraerStockValor(row, stockMode){
+  let ultimo = row.length - 1;
+  while(ultimo >= 0 && isBlank(row[ultimo])) ultimo--;
+  const sinRelleno = (ultimo === row.length - 1);
+
+  if(sinRelleno){
+    const n = row.length;
+    if(stockMode === 'disponible') return toNum(row[n-2]) + toNum(row[n-1]);
+    if(stockMode === 'deposito')   return toNum(row[n-6]) + toNum(row[n-5]);
+    return toNum(row[n-10]) + toNum(row[n-9]); // total
+  } else {
+    if(stockMode === 'disponible') return toNum(row[ultimo]);
+    if(stockMode === 'deposito')   return toNum(row[ultimo-2]);
+    return toNum(row[ultimo-6]) + toNum(row[ultimo-5]); // total (aprox.)
   }
-  return { descIdx: tieneCodProv ? 2 : 1 };
 }
 
 function parseStock(rows){
-  const fmt = detectarFormatoStock(rows);
   const stockMode = document.getElementById('cfg-stockcol').value;
   const out = [];
   let proveedorActual = null;
@@ -716,7 +740,7 @@ function parseStock(rows){
   for(const rawRow of rows){
     const row = rawRow || [];
     const code = row[0];
-    const desc = row[fmt.descIdx];
+    const desc = obtenerDescStock(row);
 
     // fila de subtotal: la detectamos buscando el texto en toda la fila
     // (su posición exacta varía según el ancho del export)
@@ -733,16 +757,7 @@ function parseStock(rows){
       const codeStr = String(code).trim();
       if(codeStr === 'Cód.' || codeStr === 'Cód. Prov') continue;
 
-      // Las columnas Total / Camión / Depósito / Reservado / Disponible p/venta
-      // son siempre los últimos 10 valores de la fila (5 pares Bultos/Unid),
-      // sin importar cuántas columnas en blanco haya antes (varía según el export).
-      const n = row.length;
-      let bIdx, uIdx;
-      if(stockMode === 'disponible')      { bIdx = n-2;  uIdx = n-1; }
-      else if(stockMode === 'deposito')   { bIdx = n-6;  uIdx = n-5; }
-      else /* total */                    { bIdx = n-10; uIdx = n-9; }
-
-      const valor = toNum(row[bIdx]) + toNum(row[uIdx]);
+      const valor = extraerStockValor(row, stockMode);
       out.push({ codigo: codeStr, descripcion: String(desc).trim(), proveedor: proveedorActual, stock: valor });
     }
   }
