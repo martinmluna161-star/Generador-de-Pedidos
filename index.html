@@ -93,17 +93,26 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--texto);mi
 .save-pill.saved{color:var(--teal);background:var(--teal-c);}
 .save-pill.error{color:var(--rojo);background:var(--rojo-c);}
 
-.tbl-wrap{overflow-x:auto;border:1px solid var(--borde);border-radius:10px;}
+.tbl-wrap{overflow:auto;border:1px solid var(--borde);border-radius:10px;max-height:72vh;}
 table{border-collapse:collapse;width:100%;font-size:12.5px;}
 thead th{position:sticky;top:0;background:var(--azul);color:white;font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.3px;padding:10px 10px;text-align:right;white-space:nowrap;z-index:5;}
-thead th.left{text-align:left;}
+thead th.left{text-align:left;position:sticky;left:0;top:0;z-index:7;}
 thead tr.grp th{background:var(--azul-m);font-size:10px;padding:5px 10px;}
+thead tr.grp th.left{background:var(--azul);}
 tbody td{padding:8px 10px;border-bottom:1px solid #EFEDE6;text-align:right;white-space:nowrap;}
-tbody td.left{text-align:left;white-space:normal;max-width:280px;}
+tbody td.left{text-align:left;white-space:normal;max-width:280px;position:sticky;left:0;background:white;z-index:2;box-shadow:2px 0 4px rgba(0,0,0,0.04);}
 tbody tr:hover{background:#FAFAF7;}
+tbody tr:hover td.left{background:#FAFAF7;}
 tbody tr.alerta{background:var(--rojo-c);}
+tbody tr.alerta td.left{background:var(--rojo-c);}
 tbody tr.alerta:hover{background:#f9d8d5;}
+tbody tr.alerta:hover td.left{background:#f9d8d5;}
 tbody tr.sin-mov td{color:#B3B1A6;}
+tbody tr.exportado{background:var(--purp-c);}
+tbody tr.exportado td.left{background:var(--purp-c);}
+tbody tr.exportado:hover{background:#e3e1fb;}
+tbody tr.exportado:hover td.left{background:#e3e1fb;}
+.badge-exportado{display:inline-block;background:var(--purp);color:white;font-size:9px;font-weight:600;border-radius:4px;padding:2px 6px;margin-left:4px;letter-spacing:0.3px;}
 .prov-tag{font-size:10px;font-weight:600;color:var(--gris);text-transform:uppercase;letter-spacing:0.3px;}
 .desc-txt{font-weight:500;}
 .cod-txt{font-family:'DM Mono',monospace;font-size:11px;color:var(--gris);}
@@ -158,7 +167,8 @@ input.comprar-input.tiene-valor{border-color:var(--teal);background:var(--teal-c
   </div>
   <div class="hdr-right">
     <button class="btn btn-ghost" onclick="abrirHistorial()">🕘 Historial de ciclos</button>
-    <button class="btn btn-teal" id="btn-exportar" onclick="confirmarGenerarYLimpiar()" disabled>⬇ Generar pedido y limpiar</button>
+    <button class="btn btn-ghost" onclick="abrirSesion()">📋 Registro de sesión</button>
+    <button class="btn btn-coral" id="btn-exportar" onclick="confirmarFinalizarSesion()" disabled>🏁 Finalizar sesión y limpiar</button>
   </div>
 </div>
 
@@ -184,30 +194,7 @@ input.comprar-input.tiene-valor{border-color:var(--teal);background:var(--teal-c
 
   <div class="card" id="card-carga" style="display:none">
     <div class="card-tit">Cargar los 4 archivos</div>
-    <div class="card-sub">Subí los exports de Axum tal cual se descargan (.xls). Se procesan en tu navegador y se guardan en la base de datos compartida — el jefe de compras los va a ver apenas termine la carga.</div>
-    <div class="cfg-row" style="border-top:none;padding-top:0;margin-top:0;margin-bottom:4px">
-      <div class="cfg-field" style="width:auto">
-        <label>Alcance del análisis</label>
-        <div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap">
-          <label class="chk-lbl"><input type="radio" name="modo-carga" value="ambos" checked onchange="onModoChange()"> Ambos depósitos</label>
-          <label class="chk-lbl"><input type="radio" name="modo-carga" value="solo_sl" onchange="onModoChange()"> Solo San Luis</label>
-          <label class="chk-lbl"><input type="radio" name="modo-carga" value="solo_vm" onchange="onModoChange()"> Solo Villa Mercedes</label>
-          <label class="chk-lbl"><input type="radio" name="modo-carga" value="movimiento" onchange="onModoChange()"> Movimiento entre depósitos</label>
-        </div>
-      </div>
-      <div class="cfg-note">Elegí "Solo San Luis" o "Solo Villa Mercedes" para trabajar con 2 archivos. "Movimiento entre depósitos" te muestra, además, cuánto stock hay en el otro depósito para evaluar transferir en vez de comprar.</div>
-    </div>
-
-    <div class="cfg-row" id="row-destino" style="display:none;border-top:none;padding-top:0;margin-top:0;margin-bottom:4px">
-      <div class="cfg-field" style="width:auto">
-        <label>Depósito que necesita reposición</label>
-        <select id="cfg-destino" onchange="onDestinoChange()" style="width:220px">
-          <option value="sl">San Luis</option>
-          <option value="vm">Villa Mercedes</option>
-        </select>
-      </div>
-      <div class="cfg-note">Subís el stock de <b>ambos</b> depósitos (para ver cuánto hay disponible en el otro) y solo el archivo de ventas del depósito que elegiste acá.</div>
-    </div>
+    <div class="card-sub">Subí siempre los 4 exports de Axum tal cual se descargan (.xls): Stock San Luis, Stock Villa Mercedes, Ventas San Luis y Ventas Villa Mercedes. Se procesan en tu navegador y se guardan en la base de datos compartida — el comprador va a poder elegir con qué tarea trabajar (San Luis, Villa Mercedes, o movimiento entre depósitos) sin que haga falta volver a cargar nada.</div>
 
     <div class="upload-grid">
       <div class="upload-box" id="box-stock_sl">
@@ -265,9 +252,26 @@ input.comprar-input.tiene-valor{border-color:var(--teal);background:var(--teal-c
 
     <div class="kpi-grid" id="kpi-grid"></div>
 
+    <div class="card" id="card-tarea">
+      <div class="card-tit">🗂️ ¿Qué tarea vas a hacer?</div>
+      <div class="card-sub">Podés ir cambiando de tarea las veces que quieras — es solo una forma de mirar los mismos datos, no hace falta volver a cargar nada.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <label class="chk-lbl"><input type="radio" name="tarea" value="pedidos_sl" onchange="onTareaChange()"> Pedidos San Luis</label>
+        <label class="chk-lbl"><input type="radio" name="tarea" value="pedidos_vm" onchange="onTareaChange()"> Pedidos Villa Mercedes</label>
+        <label class="chk-lbl"><input type="radio" name="tarea" value="abastecimiento" onchange="onTareaChange()"> Abastecimiento de depósito</label>
+        <span id="destino-abastecimiento-wrap" style="display:none;align-items:center;gap:8px">
+          <span style="font-size:12.5px;color:var(--gris)">¿Cuál necesita reposición?</span>
+          <select id="cfg-destino-tarea" onchange="onTareaChange()" style="font-size:13px;border:1.5px solid var(--borde);border-radius:7px;padding:6px 10px;background:var(--gris-c)">
+            <option value="sl">San Luis</option>
+            <option value="vm">Villa Mercedes</option>
+          </select>
+        </span>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-tit">Comparativo Stock vs. Ventas</div>
-      <div class="card-sub">Cargá la cantidad a comprar de cada producto en <b>A comprar</b>. Si ya hiciste un pedido a ese proveedor y todavía no te lo entregó, cargalo en <b>Pend. entrega</b> — el "Sugerido" lo descuenta automáticamente. Todo se guarda solo en la base de datos a los pocos segundos de dejar de tipear (mirá el indicador junto al buscador). Filas en rojo: stock igual o menor a lo vendido.</div>
+      <div class="card-sub">Cargá la cantidad a comprar de cada producto en <b>A comprar</b>. Si ya hiciste un pedido a ese proveedor y todavía no te lo entregó, cargalo en <b>Pend. entrega</b> — el "Sugerido" lo descuenta automáticamente. Todo se guarda solo en la base de datos a los pocos segundos de dejar de tipear (mirá el indicador junto al buscador). Filas en rojo: stock igual o menor a lo vendido. Filas violetas: ya se exportaron en esta sesión.</div>
 
       <div class="filter-bar">
         <input type="text" id="f-buscar" placeholder="Buscar por código o descripción…" oninput="renderTabla()">
@@ -276,6 +280,7 @@ input.comprar-input.tiene-valor{border-color:var(--teal);background:var(--teal-c
         <label class="chk-lbl"><input type="checkbox" id="f-conventas" onchange="renderTabla()"> Ocultar sin movimiento</label>
         <label class="chk-lbl"><input type="checkbox" id="f-solocompra" onchange="renderTabla()"> Solo con cantidad a comprar</label>
         <div class="spacer"></div>
+        <button class="btn btn-teal btn-sm" onclick="descargarPedidoParcial()">📥 Descargar este pedido</button>
         <span class="save-pill idle" id="save-pill">sin cambios</span>
         <span class="count-pill" id="count-pill">0 productos</span>
       </div>
@@ -325,10 +330,21 @@ input.comprar-input.tiene-valor{border-color:var(--teal);background:var(--teal-c
   </div>
 </div>
 
+<div class="hist-overlay" id="sesion-overlay">
+  <div class="hist-panel">
+    <div class="hist-panel-hdr">
+      <h2>📋 Registro de esta sesión</h2>
+      <button class="hist-close" onclick="cerrarSesion()">✕</button>
+    </div>
+    <div class="card-sub" style="margin-bottom:14px">Cada vez que descargás un pedido parcial (por proveedor o por tarea) queda anotado acá. Se reinicia solo cuando se cierra el ciclo con "Finalizar sesión y limpiar".</div>
+    <div id="sesion-content"><div class="loader">⏳ Cargando registro…</div></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
-const API_URL = 'https://script.google.com/macros/s/AKfycbwsj_rdaMg-46yDsocpn9lhgVjsWpp6jzuKxXLb9q3TGMDLcTzxGQmUKXH527Re4Rs/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwxG7Vs54wMF1YwNT5AjaahZHpsDyVqgBzMMN49qB7e7CC78jNpjXfGvSf0jGRYdee5/exec';
 
 let archivosRaw = { stock_sl: null, stock_vm: null, ventas_sl: null, ventas_vm: null };
 let productos = [];
@@ -337,10 +353,11 @@ let preciosArr = [];
 let comprasManual = {};
 let pendientesManual = {};
 let cicloMeta = null;
-let modoActual = 'ambos';
-let destinoActual = 'sl';
+let tareaActual = 'pedidos_sl';       // elegida por el comprador: pedidos_sl | pedidos_vm | abastecimiento
+let destinoAbastecimiento = 'sl';     // solo aplica cuando tareaActual === 'abastecimiento'
 let providerRE = /\bS\.?\s?A\.?\b|\bSRL\b|\bS\.R\.L\.?\b|SOCIEDAD\s+AN[OÓ]NI/i;
 let saveTimer = null;
+const LS_TAREA = 'cp_pedidos_tarea';
 
 window.addEventListener('DOMContentLoaded', () => {
   if (!API_URL || API_URL.indexOf('PEGAR_AQUI') === 0) {
@@ -348,6 +365,17 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('loader-inicial').style.display = 'none';
     return;
   }
+  try {
+    const guardada = JSON.parse(localStorage.getItem(LS_TAREA) || 'null');
+    if (guardada && guardada.tarea) {
+      tareaActual = guardada.tarea;
+      destinoAbastecimiento = guardada.destino || 'sl';
+      const radio = document.querySelector(`input[name="tarea"][value="${tareaActual}"]`);
+      if (radio) radio.checked = true;
+      document.getElementById('cfg-destino-tarea').value = destinoAbastecimiento;
+      document.getElementById('destino-abastecimiento-wrap').style.display = (tareaActual==='abastecimiento') ? 'inline-flex' : 'none';
+    }
+  } catch(e) {}
   cargarEstadoDesdeBackend();
 });
 
@@ -373,8 +401,6 @@ function cargarEstadoDesdeBackend(){
     if (data.cargado){
       productos = data.productos || [];
       cicloMeta = data.meta;
-      modoActual = (cicloMeta && cicloMeta.modo) || 'ambos';
-      destinoActual = (cicloMeta && cicloMeta.destino) || 'sl';
       comprasManual = {};
       pendientesManual = {};
       productos.forEach(p=>{
@@ -416,29 +442,57 @@ function etiquetaModo(m){
 }
 function nombreDeposito(d){ return d === 'vm' ? 'Villa Mercedes' : 'San Luis'; }
 
+function etiquetaTarea(t, destino){
+  if(t === 'pedidos_sl') return 'Pedidos San Luis';
+  if(t === 'pedidos_vm') return 'Pedidos Villa Mercedes';
+  if(t === 'abastecimiento') return `Abastecimiento — reponiendo ${nombreDeposito(destino)} retirando de ${nombreDeposito(destino==='vm'?'sl':'vm')}`;
+  return t;
+}
+
+// Recalcula, para el producto y la tarea actual, qué stock/ventas/diferencia/
+// alerta/sugerido corresponde mostrar. Los datos base (stock_sl, stock_vm,
+// ventas_sl, ventas_vm) siempre están completos porque ahora se suben los
+// 4 archivos siempre — la "tarea" es solo un lente distinto sobre lo mismo.
+function calcularVista(p){
+  const pendiente = toNum(pendientesManual[p.codigo]);
+  if(tareaActual === 'pedidos_sl'){
+    const diff = p.stock_sl - p.ventas_sl;
+    return { stockPrincipal: p.stock_sl, stockSecundario: null, ventas: p.ventas_sl, diff,
+      alerta: p.ventas_sl > 0 && p.stock_sl <= p.ventas_sl,
+      sugerido: Math.max(0, Math.ceil(p.ventas_sl - p.stock_sl - pendiente)) };
+  }
+  if(tareaActual === 'pedidos_vm'){
+    const diff = p.stock_vm - p.ventas_vm;
+    return { stockPrincipal: p.stock_vm, stockSecundario: null, ventas: p.ventas_vm, diff,
+      alerta: p.ventas_vm > 0 && p.stock_vm <= p.ventas_vm,
+      sugerido: Math.max(0, Math.ceil(p.ventas_vm - p.stock_vm - pendiente)) };
+  }
+  // abastecimiento
+  const stockDestino = destinoAbastecimiento === 'vm' ? p.stock_vm : p.stock_sl;
+  const stockOrigen  = destinoAbastecimiento === 'vm' ? p.stock_sl : p.stock_vm;
+  const ventasDestino = destinoAbastecimiento === 'vm' ? p.ventas_vm : p.ventas_sl;
+  const diff = stockDestino - ventasDestino;
+  return { stockPrincipal: stockDestino, stockSecundario: stockOrigen, ventas: ventasDestino, diff,
+    alerta: ventasDestino > 0 && stockDestino <= ventasDestino,
+    sugerido: Math.max(0, Math.ceil(ventasDestino - stockDestino - pendiente)) };
+}
+
+function onTareaChange(){
+  const radio = document.querySelector('input[name="tarea"]:checked');
+  tareaActual = radio ? radio.value : 'pedidos_sl';
+  destinoAbastecimiento = document.getElementById('cfg-destino-tarea').value;
+  document.getElementById('destino-abastecimiento-wrap').style.display = (tareaActual==='abastecimiento') ? 'inline-flex' : 'none';
+  try { localStorage.setItem(LS_TAREA, JSON.stringify({tarea:tareaActual, destino:destinoAbastecimiento})); } catch(e){}
+  renderThead();
+  renderKPIs();
+  renderTabla();
+}
+
 function renderThead(){
   const thead = document.getElementById('tabla-thead');
-  if(modoActual === 'ambos'){
-    thead.innerHTML = `
-      <tr class="grp">
-        <th class="left" rowspan="2" style="background:var(--azul)">Proveedor / Producto</th>
-        <th colspan="3">Stock (u.)</th>
-        <th colspan="3">Ventas del período (u.)</th>
-        <th colspan="3">Diferencia (stock − ventas)</th>
-        <th rowspan="2">Precio unit.</th>
-        <th rowspan="2">Pend. entrega</th>
-        <th rowspan="2">Sugerido</th>
-        <th rowspan="2">A comprar</th>
-        <th rowspan="2">Estimado $</th>
-      </tr>
-      <tr>
-        <th>SL</th><th>VM</th><th>Total</th>
-        <th>SL</th><th>VM</th><th>Total</th>
-        <th>SL</th><th>VM</th><th>Total</th>
-      </tr>`;
-  } else if(modoActual === 'movimiento'){
-    const destEtq = nombreDeposito(destinoActual);
-    const origEtq = nombreDeposito(destinoActual === 'vm' ? 'sl' : 'vm');
+  if(tareaActual === 'abastecimiento'){
+    const destEtq = nombreDeposito(destinoAbastecimiento);
+    const origEtq = nombreDeposito(destinoAbastecimiento === 'vm' ? 'sl' : 'vm');
     thead.innerHTML = `
       <tr class="grp">
         <th class="left" style="background:var(--azul)">Proveedor / Producto</th>
@@ -453,7 +507,7 @@ function renderThead(){
         <th>Estimado $</th>
       </tr>`;
   } else {
-    const etiqueta = modoActual === 'solo_sl' ? 'San Luis' : 'Villa Mercedes';
+    const etiqueta = tareaActual === 'pedidos_sl' ? 'San Luis' : 'Villa Mercedes';
     thead.innerHTML = `
       <tr class="grp">
         <th class="left" style="background:var(--azul)">Proveedor / Producto</th>
@@ -473,23 +527,18 @@ function mostrarBannerCargado(){
   const fecha = new Date(cicloMeta.fecha_carga).toLocaleString('es-AR');
   const periodoTxt = (cicloMeta.periodoInicio && cicloMeta.periodoFin)
     ? `<span class="periodo-chip">${cicloMeta.periodoInicio} → ${cicloMeta.periodoFin}</span> ` : '';
-  const alcanceTxt = (modoActual === 'movimiento')
-    ? `Movimiento entre depósitos — reponiendo <b>${nombreDeposito(destinoActual)}</b> retirando de <b>${nombreDeposito(destinoActual==='vm'?'sl':'vm')}</b>`
-    : etiquetaModo(modoActual);
   document.getElementById('banner-estado').innerHTML = `
     <div class="banner ok">
       <div class="b-icon">📅</div>
-      <div class="b-text"><b>Ciclo cargado el ${fecha}</b> · <b>${alcanceTxt}</b><br>Ventas del período ${periodoTxt}(reales, sin proyectar) · stock: ${etiquetaStockMode(cicloMeta.stockMode)}.</div>
+      <div class="b-text"><b>Ciclo cargado el ${fecha}</b><br>Ventas del período ${periodoTxt}(reales, sin proyectar) · stock: ${etiquetaStockMode(cicloMeta.stockMode)}.</div>
       <div class="b-actions"><button class="btn btn-white btn-sm" onclick="mostrarCargaManual()">↺ Cargar archivos nuevos</button></div>
     </div>`;
 
   let vendHtml = '';
-  const mostrarSL = modoActual !== 'solo_vm' && !(modoActual==='movimiento' && destinoActual==='vm');
-  const mostrarVM = modoActual !== 'solo_sl' && !(modoActual==='movimiento' && destinoActual==='sl');
-  if(mostrarSL && cicloMeta.vendedoresSL){
+  if(cicloMeta.vendedoresSL){
     vendHtml += `<div class="banner info" style="margin-top:10px"><div class="b-icon">🧑‍💼</div><div class="b-text"><b>Vendedores incluidos — San Luis:</b> ${formatVendedores(cicloMeta.vendedoresSL.split(',').filter(Boolean))}</div></div>`;
   }
-  if(mostrarVM && cicloMeta.vendedoresVM){
+  if(cicloMeta.vendedoresVM){
     vendHtml += `<div class="banner info" style="margin-top:10px"><div class="b-icon">🧑‍💼</div><div class="b-text"><b>Vendedores incluidos — Villa Mercedes:</b> ${formatVendedores(cicloMeta.vendedoresVM.split(',').filter(Boolean))}</div></div>`;
   }
   document.getElementById('banner-estado').innerHTML += vendHtml;
@@ -527,33 +576,9 @@ function showToast(msg, isErr){
 
 function renderPeriodoBanner(){
   const cont = document.getElementById('periodo-banner');
-  let modo = getModoCarga();
   const pSL = archivosRaw.ventas_sl && archivosRaw.ventas_sl.periodo;
   const pVM = archivosRaw.ventas_vm && archivosRaw.ventas_vm.periodo;
 
-  if(modo === 'movimiento') modo = (getDestino() === 'sl') ? 'solo_sl' : 'solo_vm';
-
-  if(modo === 'solo_sl'){
-    if(!archivosRaw.ventas_sl){ cont.innerHTML = ''; return; }
-    if(!pSL){
-      cont.innerHTML = `<div class="banner warn" style="margin-bottom:0;margin-top:14px"><div class="b-icon">⚠️</div><div class="b-text">No pudimos detectar el período de ventas en el archivo de <b>San Luis</b>. Las ventas se van a tomar igual tal cual figuran en el archivo, pero no vamos a poder mostrarte de qué período son.</div></div>`;
-      return;
-    }
-    cont.innerHTML = `<div class="banner ok" style="margin-bottom:0;margin-top:14px"><div class="b-icon">📅</div><div class="b-text">Período de ventas (San Luis): <span class="periodo-chip">${pSL.inicioStr} → ${pSL.finStr}</span> · ${pSL.dias} días.</div></div>`;
-    return;
-  }
-
-  if(modo === 'solo_vm'){
-    if(!archivosRaw.ventas_vm){ cont.innerHTML = ''; return; }
-    if(!pVM){
-      cont.innerHTML = `<div class="banner warn" style="margin-bottom:0;margin-top:14px"><div class="b-icon">⚠️</div><div class="b-text">No pudimos detectar el período de ventas en el archivo de <b>Villa Mercedes</b>. Las ventas se van a tomar igual tal cual figuran en el archivo, pero no vamos a poder mostrarte de qué período son.</div></div>`;
-      return;
-    }
-    cont.innerHTML = `<div class="banner ok" style="margin-bottom:0;margin-top:14px"><div class="b-icon">📅</div><div class="b-text">Período de ventas (Villa Mercedes): <span class="periodo-chip">${pVM.inicioStr} → ${pVM.finStr}</span> · ${pVM.dias} días.</div></div>`;
-    return;
-  }
-
-  // modo === 'ambos'
   if(!archivosRaw.ventas_sl && !archivosRaw.ventas_vm){ cont.innerHTML = ''; return; }
 
   const faltaSL = archivosRaw.ventas_sl && !pSL;
@@ -595,71 +620,9 @@ function renderPeriodoBanner(){
   </div>`;
 }
 
-function getModoCarga(){
-  const el = document.querySelector('input[name="modo-carga"]:checked');
-  return el ? el.value : 'ambos';
-}
-
-function getDestino(){
-  const el = document.getElementById('cfg-destino');
-  return el ? el.value : 'sl';
-}
-
 function actualizarBotonProcesar(){
-  const modo = getModoCarga();
-  let listo;
-  if(modo === 'ambos') listo = archivosRaw.stock_sl && archivosRaw.stock_vm && archivosRaw.ventas_sl && archivosRaw.ventas_vm;
-  else if(modo === 'solo_sl') listo = archivosRaw.stock_sl && archivosRaw.ventas_sl;
-  else if(modo === 'solo_vm') listo = archivosRaw.stock_vm && archivosRaw.ventas_vm;
-  else { // movimiento
-    const destino = getDestino();
-    listo = archivosRaw.stock_sl && archivosRaw.stock_vm && archivosRaw['ventas_'+destino];
-  }
+  const listo = archivosRaw.stock_sl && archivosRaw.stock_vm && archivosRaw.ventas_sl && archivosRaw.ventas_vm;
   document.getElementById('btn-procesar').disabled = !listo;
-}
-
-function limpiarCasillero(key){
-  archivosRaw[key] = null;
-  document.getElementById('box-'+key).classList.remove('filled');
-  document.getElementById('file-'+key).innerHTML = '';
-}
-
-function onModoChange(){
-  const modo = getModoCarga();
-  document.getElementById('row-destino').style.display = (modo === 'movimiento') ? '' : 'none';
-
-  if(modo === 'movimiento'){
-    document.getElementById('box-stock_sl').style.display = '';
-    document.getElementById('box-stock_vm').style.display = '';
-    aplicarVisibilidadVentasMovimiento();
-  } else {
-    const showSL = modo === 'ambos' || modo === 'solo_sl';
-    const showVM = modo === 'ambos' || modo === 'solo_vm';
-    document.getElementById('box-stock_sl').style.display = showSL ? '' : 'none';
-    document.getElementById('box-ventas_sl').style.display = showSL ? '' : 'none';
-    document.getElementById('box-stock_vm').style.display = showVM ? '' : 'none';
-    document.getElementById('box-ventas_vm').style.display = showVM ? '' : 'none';
-    if(!showSL){ limpiarCasillero('stock_sl'); limpiarCasillero('ventas_sl'); }
-    if(!showVM){ limpiarCasillero('stock_vm'); limpiarCasillero('ventas_vm'); }
-  }
-  actualizarBotonProcesar();
-  renderPeriodoBanner();
-  renderVendedoresBanner();
-}
-
-function aplicarVisibilidadVentasMovimiento(){
-  const destino = getDestino();
-  document.getElementById('box-ventas_sl').style.display = (destino === 'sl') ? '' : 'none';
-  document.getElementById('box-ventas_vm').style.display = (destino === 'vm') ? '' : 'none';
-  if(destino !== 'sl') limpiarCasillero('ventas_sl');
-  if(destino !== 'vm') limpiarCasillero('ventas_vm');
-}
-
-function onDestinoChange(){
-  aplicarVisibilidadVentasMovimiento();
-  actualizarBotonProcesar();
-  renderPeriodoBanner();
-  renderVendedoresBanner();
 }
 
 function onFile(evt, key){
@@ -820,18 +783,14 @@ function formatVendedores(codigos, plano){
 
 function renderVendedoresBanner(){
   const cont = document.getElementById('vendedores-banner');
-  const modo = getModoCarga();
-  const destino = getDestino();
   const vSL = archivosRaw.ventas_sl && archivosRaw.ventas_sl.vendedores;
   const vVM = archivosRaw.ventas_vm && archivosRaw.ventas_vm.vendedores;
 
   let html = '';
-  const mostrarSL = modo === 'ambos' || modo === 'solo_sl' || (modo === 'movimiento' && destino === 'sl');
-  const mostrarVM = modo === 'ambos' || modo === 'solo_vm' || (modo === 'movimiento' && destino === 'vm');
-  if(mostrarSL && archivosRaw.ventas_sl){
+  if(archivosRaw.ventas_sl){
     html += `<div class="banner info" style="margin-bottom:0;margin-top:10px"><div class="b-icon">🧑‍💼</div><div class="b-text"><b>Vendedores incluidos — San Luis:</b> ${vSL ? formatVendedores(vSL) : '⚠️ no se pudo detectar en el archivo'}</div></div>`;
   }
-  if(mostrarVM && archivosRaw.ventas_vm){
+  if(archivosRaw.ventas_vm){
     html += `<div class="banner info" style="margin-bottom:0;margin-top:10px"><div class="b-icon">🧑‍💼</div><div class="b-text"><b>Vendedores incluidos — Villa Mercedes:</b> ${vVM ? formatVendedores(vVM) : '⚠️ no se pudo detectar en el archivo'}</div></div>`;
   }
   cont.innerHTML = html;
@@ -894,8 +853,6 @@ function parseVentas(rows){
 }
 
 function construirDataset(){
-  const modo = getModoCarga();
-  const destino = getDestino();
   const stockSL = archivosRaw.stock_sl ? parseStock(archivosRaw.stock_sl.rows) : [];
   const stockVM = archivosRaw.stock_vm ? parseStock(archivosRaw.stock_vm.rows) : [];
   const ventasSL = archivosRaw.ventas_sl ? parseVentas(archivosRaw.ventas_sl.rows) : [];
@@ -927,11 +884,13 @@ function construirDataset(){
                          (ventasVM.find(p=>p.codigo===codigo)||{}).descripcion || '(sin descripción)';
     const proveedor = (sSL && sSL.proveedor) || (sVM && sVM.proveedor) || ventasSLProv[codigo] || ventasVMProv[codigo] || 'Sin proveedor asignado';
 
-    // En "movimiento", stock_total/ventas_total representan solo el depósito
-    // destino (el que necesita reposición) — el otro stock queda disponible
-    // en stock_sl/stock_vm para mostrarlo como referencia de transferencia,
-    // pero no se suma a la diferencia ni a la alerta.
-    const stockTotal = (modo === 'movimiento') ? (destino === 'sl' ? stockSLv : stockVMv) : (stockSLv + stockVMv);
+    // stock_total/ventas_total/diff_total quedan siempre como la suma de
+    // ambos depósitos (la vista "de conjunto"). Las tareas del comprador
+    // (Pedidos SL, Pedidos VM, Abastecimiento) recalculan su propia mirada
+    // en el momento, en calcularVista(), a partir de stock_sl/stock_vm/
+    // ventas_sl/ventas_vm — que siempre están completos porque ahora se
+    // suben los 4 archivos siempre.
+    const stockTotal = stockSLv + stockVMv;
     const ventasTotal = ventasSLv + ventasVMv;
     const diffSL = stockSLv - ventasSLv;
     const diffVM = stockVMv - ventasVMv;
@@ -948,7 +907,7 @@ function construirDataset(){
       stock_sl: stockSLv, stock_vm: stockVMv, stock_total: stockTotal,
       ventas_sl: ventasSLv, ventas_vm: ventasVMv, ventas_total: ventasTotal,
       diff_sl: diffSL, diff_vm: diffVM, diff_total: diffTotal,
-      alerta, sugerido, a_comprar: 0, pedido_pendiente: 0
+      alerta, sugerido, a_comprar: 0, pedido_pendiente: 0, exportado: false
     });
   });
 
@@ -965,28 +924,17 @@ function construirDataset(){
     periodoInicio: periodoRef ? periodoRef.inicioStr : '',
     periodoFin: periodoRef ? periodoRef.finStr : '',
     vendedoresSL, vendedoresVM,
-    modo, destino: (modo === 'movimiento') ? destino : ''
+    modo: 'ambos', destino: ''
   };
 }
 
 function iniciarProceso(){
-  const modo = getModoCarga();
-
-  if(modo === 'ambos'){
-    const pSL = archivosRaw.ventas_sl && archivosRaw.ventas_sl.periodo;
-    const pVM = archivosRaw.ventas_vm && archivosRaw.ventas_vm.periodo;
-    if(!pSL || !pVM){
-      if(!confirm(`No pudimos detectar el período de ventas en uno de los dos archivos.\n\nLas ventas se van a cargar igual, tal cual figuran en cada archivo. ¿Confirmás que querés continuar?`)) return;
-    } else if(pSL.inicioStr !== pVM.inicioStr || pSL.finStr !== pVM.finStr){
-      if(!confirm(`Los archivos de ventas cubren períodos DISTINTOS:\n\nSan Luis: ${pSL.inicioStr} → ${pSL.finStr} (${pSL.dias} días)\nVilla Mercedes: ${pVM.inicioStr} → ${pVM.finStr} (${pVM.dias} días)\n\n¿Confirmás que querés continuar de todas formas?`)) return;
-    }
-  } else {
-    const key = modo === 'movimiento' ? ('ventas_' + getDestino()) : (modo === 'solo_sl' ? 'ventas_sl' : 'ventas_vm');
-    const cual = (modo === 'movimiento' ? getDestino() : modo.replace('solo_','')) === 'sl' ? 'San Luis' : 'Villa Mercedes';
-    const p = archivosRaw[key] && archivosRaw[key].periodo;
-    if(!p){
-      if(!confirm(`No pudimos detectar el período de ventas del archivo de ${cual}.\n\nLas ventas se van a cargar igual, tal cual figuran en el archivo. ¿Confirmás que querés continuar?`)) return;
-    }
+  const pSL = archivosRaw.ventas_sl && archivosRaw.ventas_sl.periodo;
+  const pVM = archivosRaw.ventas_vm && archivosRaw.ventas_vm.periodo;
+  if(!pSL || !pVM){
+    if(!confirm(`No pudimos detectar el período de ventas en uno de los dos archivos.\n\nLas ventas se van a cargar igual, tal cual figuran en cada archivo. ¿Confirmás que querés continuar?`)) return;
+  } else if(pSL.inicioStr !== pVM.inicioStr || pSL.finStr !== pVM.finStr){
+    if(!confirm(`Los archivos de ventas cubren períodos DISTINTOS:\n\nSan Luis: ${pSL.inicioStr} → ${pSL.finStr} (${pSL.dias} días)\nVilla Mercedes: ${pVM.inicioStr} → ${pVM.finStr} (${pVM.dias} días)\n\n¿Confirmás que querés continuar de todas formas?`)) return;
   }
   procesarYSubir(false);
 }
@@ -1027,9 +975,6 @@ function procesarYSubir(force){
         });
         document.getElementById('periodo-banner').innerHTML = '';
         document.getElementById('vendedores-banner').innerHTML = '';
-        document.querySelector('input[name="modo-carga"][value="ambos"]').checked = true;
-        document.getElementById('cfg-destino').value = 'sl';
-        onModoChange();
         btn.disabled = true; btn.textContent = 'Procesar y guardar ciclo';
         document.getElementById('parse-status').innerHTML = '';
         cargarEstadoDesdeBackend();
@@ -1046,7 +991,7 @@ function procesarYSubir(force){
 
 function renderKPIs(){
   const total = productos.length;
-  const alertas = productos.filter(p=>p.alerta).length;
+  const alertas = productos.filter(p=>calcularVista(p).alerta).length;
   const proveedores = new Set(productos.map(p=>p.proveedor)).size;
   const cargados = Object.values(comprasManual).filter(v=>toNum(v)>0).length;
   let estimado = 0, sinPrecio = 0;
@@ -1060,7 +1005,7 @@ function renderKPIs(){
   const grid = document.getElementById('kpi-grid');
   grid.innerHTML = `
     <div class="kpi"><div class="kpi-val">${total}</div><div class="kpi-lbl">Productos</div></div>
-    <div class="kpi alerta"><div class="kpi-val">${alertas}</div><div class="kpi-lbl">En alerta de quiebre</div></div>
+    <div class="kpi alerta"><div class="kpi-val">${alertas}</div><div class="kpi-lbl">En alerta de quiebre (${etiquetaTarea(tareaActual, destinoAbastecimiento)})</div></div>
     <div class="kpi"><div class="kpi-val">${proveedores}</div><div class="kpi-lbl">Proveedores</div></div>
     <div class="kpi"><div class="kpi-val">${cargados}</div><div class="kpi-lbl">Con cantidad a comprar</div></div>
     <div class="kpi dinero"><div class="kpi-val">${estimado>0?fmtMoney(estimado):'—'}</div><div class="kpi-lbl">Estimado del pedido${sinPrecio>0?` (${sinPrecio} sin precio)`:''}</div></div>
@@ -1073,11 +1018,6 @@ function poblarFiltroProveedor(){
   sel.innerHTML = '<option value="">Todos los proveedores</option>' + provs.map(p=>`<option value="${escHtml(p)}">${escHtml(p)}</option>`).join('');
 }
 
-function calcularSugerido(p){
-  const pendiente = toNum(pendientesManual[p.codigo]);
-  return Math.max(0, Math.ceil(p.ventas_total - p.stock_total - pendiente));
-}
-
 function renderTabla(){
   const buscar = document.getElementById('f-buscar').value.trim().toLowerCase();
   const provFiltro = document.getElementById('f-proveedor').value;
@@ -1088,15 +1028,16 @@ function renderTabla(){
   const filtrados = productos.filter(p=>{
     if(buscar && !(String(p.codigo).toLowerCase().includes(buscar) || String(p.descripcion).toLowerCase().includes(buscar))) return false;
     if(provFiltro && p.proveedor !== provFiltro) return false;
-    if(soloAlertas && !p.alerta) return false;
-    if(ocultarSinMov && toNum(p.stock_total)===0 && toNum(p.ventas_total)===0) return false;
+    const vista = calcularVista(p);
+    if(soloAlertas && !vista.alerta) return false;
+    if(ocultarSinMov && toNum(vista.stockPrincipal)===0 && toNum(vista.ventas)===0) return false;
     if(soloConCompra && toNum(comprasManual[p.codigo]) <= 0) return false;
     return true;
   });
 
   document.getElementById('count-pill').textContent = filtrados.length + ' productos';
 
-  const colspanVacio = modoActual === 'ambos' ? 15 : (modoActual === 'movimiento' ? 10 : 9);
+  const colspanVacio = tareaActual === 'abastecimiento' ? 10 : 9;
   const body = document.getElementById('tbl-body');
   if(filtrados.length===0){
     body.innerHTML = `<tr><td colspan="${colspanVacio}"><div class="empty-state"><div class="ico">🔍</div>No hay productos que coincidan con los filtros.</div></td></tr>`;
@@ -1106,7 +1047,9 @@ function renderTabla(){
   let html = '';
   let provAnterior = null;
   filtrados.forEach(p=>{
-    const cls = p.alerta ? 'alerta' : (toNum(p.stock_total)===0 && toNum(p.ventas_total)===0 ? 'sin-mov' : '');
+    const vista = calcularVista(p);
+    const yaExportado = p.exportado === true || p.exportado === 'true' || p.exportado === 'TRUE';
+    const cls = yaExportado ? 'exportado' : (vista.alerta ? 'alerta' : (toNum(vista.stockPrincipal)===0 && toNum(vista.ventas)===0 ? 'sin-mov' : ''));
     const valCompra = comprasManual[p.codigo] !== undefined ? comprasManual[p.codigo] : '';
     const tieneValor = toNum(valCompra) > 0;
     const valPendiente = pendientesManual[p.codigo] !== undefined ? pendientesManual[p.codigo] : '';
@@ -1121,48 +1064,33 @@ function renderTabla(){
              onchange="setPendiente('${String(p.codigo).replace(/'/g,"\\'")}', this.value, this)">`;
     const celdaProducto = `<td class="left">
         ${p.proveedor !== provAnterior ? `<div class="prov-tag">${escHtml(p.proveedor)}</div>` : ''}
-        <div class="desc-txt">${escHtml(p.descripcion)}${p.alerta?'<span class="badge-alerta">ALERTA</span>':''}</div>
+        <div class="desc-txt">${escHtml(p.descripcion)}${vista.alerta?'<span class="badge-alerta">ALERTA</span>':''}${yaExportado?'<span class="badge-exportado">YA PEDIDO</span>':''}</div>
         <div class="cod-txt">${escHtml(p.codigo)}</div>
       </td>`;
+    const sugerido = vista.sugerido;
 
-    if(modoActual === 'ambos'){
+    if(tareaActual === 'abastecimiento'){
       html += `<tr class="${cls}">
         ${celdaProducto}
-        <td>${fmt(p.stock_sl)}</td><td>${fmt(p.stock_vm)}</td><td><b>${fmt(p.stock_total)}</b></td>
-        <td>${fmt(p.ventas_sl)}</td><td>${fmt(p.ventas_vm)}</td><td><b>${fmt(p.ventas_total)}</b></td>
-        <td class="${p.diff_sl<0?'neg':'pos'}">${fmt(p.diff_sl)}</td>
-        <td class="${p.diff_vm<0?'neg':'pos'}">${fmt(p.diff_vm)}</td>
-        <td class="${p.diff_total<0?'neg':'pos'}"><b>${fmt(p.diff_total)}</b></td>
+        <td><b>${fmt(vista.stockPrincipal)}</b></td>
+        <td class="pos">${fmt(vista.stockSecundario)}</td>
+        <td><b>${fmt(vista.ventas)}</b></td>
+        <td class="${vista.diff<0?'neg':'pos'}"><b>${fmt(vista.diff)}</b></td>
         <td class="precio-txt ${precio?'':'sinprecio'}">${precio?fmtMoney(precio):'sin precio'}</td>
         <td>${inputPendiente}</td>
-        <td class="sug-txt">${(() => { const s = calcularSugerido(p); return s>0?fmt(s):'—'; })()}</td>
-        <td>${inputCompra}</td>
-        <td class="estimado-txt">${estimado!==null && estimado>0 ? fmtMoney(estimado) : '—'}</td>
-      </tr>`;
-    } else if(modoActual === 'movimiento'){
-      const stockDestino = destinoActual === 'vm' ? p.stock_vm : p.stock_sl;
-      const stockOrigen = destinoActual === 'vm' ? p.stock_sl : p.stock_vm;
-      html += `<tr class="${cls}">
-        ${celdaProducto}
-        <td><b>${fmt(stockDestino)}</b></td>
-        <td class="pos">${fmt(stockOrigen)}</td>
-        <td><b>${fmt(p.ventas_total)}</b></td>
-        <td class="${p.diff_total<0?'neg':'pos'}"><b>${fmt(p.diff_total)}</b></td>
-        <td class="precio-txt ${precio?'':'sinprecio'}">${precio?fmtMoney(precio):'sin precio'}</td>
-        <td>${inputPendiente}</td>
-        <td class="sug-txt">${(() => { const s = calcularSugerido(p); return s>0?fmt(s):'—'; })()}</td>
+        <td class="sug-txt">${sugerido>0?fmt(sugerido):'—'}</td>
         <td>${inputCompra}</td>
         <td class="estimado-txt">${estimado!==null && estimado>0 ? fmtMoney(estimado) : '—'}</td>
       </tr>`;
     } else {
       html += `<tr class="${cls}">
         ${celdaProducto}
-        <td><b>${fmt(p.stock_total)}</b></td>
-        <td><b>${fmt(p.ventas_total)}</b></td>
-        <td class="${p.diff_total<0?'neg':'pos'}"><b>${fmt(p.diff_total)}</b></td>
+        <td><b>${fmt(vista.stockPrincipal)}</b></td>
+        <td><b>${fmt(vista.ventas)}</b></td>
+        <td class="${vista.diff<0?'neg':'pos'}"><b>${fmt(vista.diff)}</b></td>
         <td class="precio-txt ${precio?'':'sinprecio'}">${precio?fmtMoney(precio):'sin precio'}</td>
         <td>${inputPendiente}</td>
-        <td class="sug-txt">${(() => { const s = calcularSugerido(p); return s>0?fmt(s):'—'; })()}</td>
+        <td class="sug-txt">${sugerido>0?fmt(sugerido):'—'}</td>
         <td>${inputCompra}</td>
         <td class="estimado-txt">${estimado!==null && estimado>0 ? fmtMoney(estimado) : '—'}</td>
       </tr>`;
@@ -1209,33 +1137,61 @@ function guardarComprasEnBackend(){
     .catch(()=>{ pill.className='save-pill error'; pill.textContent='error de conexión'; });
 }
 
-function confirmarGenerarYLimpiar(){
-  const items = productos.filter(p => toNum(comprasManual[p.codigo]) > 0);
+function descargarPedidoParcial(){
+  const provFiltro = document.getElementById('f-proveedor').value;
+  let items = productos.filter(p => toNum(comprasManual[p.codigo]) > 0);
+  if(provFiltro) items = items.filter(p => p.proveedor === provFiltro);
+
   if(items.length === 0){
-    alert('No hay cantidades cargadas en "A comprar". Completá al menos un producto antes de generar el pedido.');
+    alert('No hay productos con cantidad cargada en "A comprar" que coincidan con el filtro de proveedor actual.');
     return;
   }
-  if(!confirm(`Se va a generar el Excel de pedidos con ${items.length} producto(s) y luego se va a LIMPIAR el ciclo actual para que la administrativa pueda cargar los archivos del próximo pedido.\n\n¿Confirmás?`)) return;
 
-  clearTimeout(saveTimer);
-  guardarComprasEnBackend();
+  const filtroLabel = provFiltro || 'Todos los proveedores';
+  const tareaLabel = etiquetaTarea(tareaActual, destinoAbastecimiento);
 
-  exportarPedidos(items);
+  exportarPedidos(items, tareaLabel, filtroLabel);
 
-  apiPost({ action:'limpiar' }).then(res=>{
+  const unidades = items.reduce((s,p)=>s+toNum(comprasManual[p.codigo]),0);
+  const estimado = items.reduce((s,p)=>{ const pr=preciosMap[p.codigo]; return s + (pr? pr*toNum(comprasManual[p.codigo]) : 0); },0);
+  const codigos = items.map(p=>p.codigo);
+
+  apiPost({ action:'registrarExportacion', tarea: tareaLabel, filtro: filtroLabel, codigos,
+            items: items.length, unidades, estimado }).then(res=>{
     if(res.ok){
-      showToast('Pedido generado y ciclo limpiado ✓');
-      productos = []; comprasManual = {}; pendientesManual = {};
-      cargarEstadoDesdeBackend();
+      codigos.forEach(cod=>{ const p = productos.find(pp=>pp.codigo===cod); if(p) p.exportado = true; });
+      renderTabla();
+      showToast(`Pedido descargado y anotado en el registro de la sesión ✓ (${items.length} producto(s))`);
     } else {
-      showToast('El Excel se generó, pero no se pudo limpiar el ciclo: ' + (res.error||''), true);
+      showToast('El Excel se descargó, pero no se pudo anotar en el registro de sesión.', true);
     }
-  }).catch(err=>{
-    showToast('El Excel se generó, pero hubo un error de conexión al limpiar el ciclo.', true);
+  }).catch(()=>{
+    showToast('El Excel se descargó, pero hubo un error de conexión al anotar el registro.', true);
   });
 }
 
-function exportarPedidos(items){
+function confirmarFinalizarSesion(){
+  const sinExportar = productos.filter(p => toNum(comprasManual[p.codigo]) > 0 && !(p.exportado===true || p.exportado==='true' || p.exportado==='TRUE'));
+  if(sinExportar.length > 0){
+    if(!confirm(`Hay ${sinExportar.length} producto(s) con cantidad cargada en "A comprar" que todavía NO bajaste como pedido (no tienen la marca "YA PEDIDO").\n\nSi cerrás la sesión ahora, esas cantidades se van a perder sin quedar en ningún Excel.\n\n¿Confirmás que querés cerrar igual?`)) return;
+  } else {
+    if(!confirm('Se va a cerrar el ciclo actual y limpiar la base de datos para que la administrativa pueda cargar los archivos del próximo pedido.\n\n¿Confirmás?')) return;
+  }
+
+  apiPost({ action:'limpiar' }).then(res=>{
+    if(res.ok){
+      showToast('Sesión finalizada y ciclo limpiado ✓');
+      productos = []; comprasManual = {}; pendientesManual = {};
+      cargarEstadoDesdeBackend();
+    } else {
+      showToast('No se pudo cerrar el ciclo: ' + (res.error||''), true);
+    }
+  }).catch(()=>{
+    showToast('Hubo un error de conexión al cerrar el ciclo.', true);
+  });
+}
+
+function exportarPedidos(items, tareaLabel, filtroLabel){
   const porProveedor = {};
   items.forEach(p=>{
     if(!porProveedor[p.proveedor]) porProveedor[p.proveedor] = [];
@@ -1248,8 +1204,9 @@ function exportarPedidos(items){
     ['Pedidos de Compra — Congelados Puntanos'],
     ['Generado: ' + new Date().toLocaleString('es-AR')],
     ['Ciclo cargado: ' + (cicloMeta ? new Date(cicloMeta.fecha_carga).toLocaleString('es-AR') : '')],
-    ['Alcance: ' + (modoActual==='movimiento' ? `Movimiento entre depósitos — reponiendo ${nombreDeposito(destinoActual)} retirando de ${nombreDeposito(destinoActual==='vm'?'sl':'vm')}` : etiquetaModo(modoActual))],
-    ['Período de ventas: ' + (cicloMeta && cicloMeta.periodoInicio ? `${cicloMeta.periodoInicio} → ${cicloMeta.periodoFin}` : `(no detectado — base ${cicloMeta?cicloMeta.dias:''} días)`)],
+    ['Tarea: ' + (tareaLabel || etiquetaTarea(tareaActual, destinoAbastecimiento))],
+    ['Filtro de proveedor: ' + (filtroLabel || 'Todos')],
+    ['Período de ventas: ' + (cicloMeta && cicloMeta.periodoInicio ? `${cicloMeta.periodoInicio} → ${cicloMeta.periodoFin}` : `(no detectado)`)],
     ['Vendedores San Luis: ' + (cicloMeta && cicloMeta.vendedoresSL ? formatVendedores(cicloMeta.vendedoresSL.split(',').filter(Boolean), true) : '—')],
     ['Vendedores Villa Mercedes: ' + (cicloMeta && cicloMeta.vendedoresVM ? formatVendedores(cicloMeta.vendedoresVM.split(',').filter(Boolean), true) : '—')],
     [],
@@ -1274,8 +1231,9 @@ function exportarPedidos(items){
     const aoa = [
       ['Pedido de Compra — ' + prov],
       ['Generado: ' + new Date().toLocaleString('es-AR')],
+      ['Tarea: ' + (tareaLabel || etiquetaTarea(tareaActual, destinoAbastecimiento))],
       [],
-      ['Código', 'Descripción', 'Stock SL', 'Stock VM', 'Stock Total', 'Ventas Total (período)', 'Pend. entrega', 'Precio unit.', 'Cantidad a Comprar', 'Estimado $']
+      ['Código', 'Descripción', 'Stock SL', 'Stock VM', 'Ventas SL (período)', 'Ventas VM (período)', 'Pend. entrega', 'Precio unit.', 'Cantidad a Comprar', 'Estimado $']
     ];
     arr.sort((a,b)=>a.descripcion.localeCompare(b.descripcion));
     arr.forEach(p=>{
@@ -1283,10 +1241,10 @@ function exportarPedidos(items){
       const pendiente = toNum(pendientesManual[p.codigo]);
       const precio = preciosMap[p.codigo] || '';
       aoa.push([p.codigo, p.descripcion, Math.round(p.stock_sl*100)/100, Math.round(p.stock_vm*100)/100,
-                Math.round(p.stock_total*100)/100, Math.round(p.ventas_total*100)/100, pendiente||'', precio, cant, precio?precio*cant:'']);
+                Math.round(p.ventas_sl*100)/100, Math.round(p.ventas_vm*100)/100, pendiente||'', precio, cant, precio?precio*cant:'']);
     });
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{wch:12},{wch:42},{wch:10},{wch:10},{wch:12},{wch:16},{wch:12},{wch:12},{wch:14},{wch:14}];
+    ws['!cols'] = [{wch:12},{wch:42},{wch:10},{wch:10},{wch:14},{wch:14},{wch:12},{wch:12},{wch:14},{wch:14}];
     let sheetName = prov.replace(/[\\\/\?\*\[\]:]/g,'').substring(0,31) || 'Proveedor';
     let base = sheetName, i2 = 1;
     while(wb.SheetNames.includes(sheetName)){ sheetName = (base.substring(0,28) + '_' + (++i2)); }
@@ -1294,7 +1252,8 @@ function exportarPedidos(items){
   });
 
   const fecha = new Date().toISOString().slice(0,10);
-  XLSX.writeFile(wb, `Pedidos_Compra_CongeladosPuntanos_${fecha}.xlsx`);
+  const hora = new Date().toTimeString().slice(0,5).replace(':','');
+  XLSX.writeFile(wb, `Pedidos_Compra_CongeladosPuntanos_${fecha}_${hora}.xlsx`);
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1435,6 +1394,41 @@ function abrirHistorial(){
   });
 }
 function cerrarHistorial(){ document.getElementById('hist-overlay').classList.remove('open'); }
+
+function abrirSesion(){
+  document.getElementById('sesion-overlay').classList.add('open');
+  document.getElementById('sesion-content').innerHTML = '<div class="loader">⏳ Cargando registro…</div>';
+  apiGet('sesion').then(data=>{
+    const registro = data.registro || [];
+    if(registro.length===0){
+      document.getElementById('sesion-content').innerHTML = '<div class="empty-state"><div class="ico">📋</div>Todavía no exportaste ningún pedido en esta sesión.</div>';
+      return;
+    }
+    let html = `<table class="hist-tbl"><thead><tr>
+      <th>Hora</th><th>Tarea</th><th>Proveedor</th><th>Ítems</th><th>Unidades</th><th>Estimado $</th>
+    </tr></thead><tbody>`;
+    let totItems=0, totUnid=0, totEst=0;
+    registro.forEach(r=>{
+      const hora = r.fecha_hora ? new Date(r.fecha_hora).toLocaleString('es-AR') : '—';
+      totItems += Number(r.items)||0; totUnid += Number(r.unidades)||0; totEst += Number(r.estimado)||0;
+      html += `<tr>
+        <td>${hora}</td>
+        <td>${escHtml(r.tarea||'')}</td>
+        <td>${escHtml(r.filtro||'Todos')}</td>
+        <td>${r.items||0}</td>
+        <td>${r.unidades?fmt(r.unidades):'0'}</td>
+        <td>${r.estimado?fmtMoney(r.estimado):'—'}</td>
+      </tr>`;
+    });
+    html += `</tbody><tfoot><tr style="font-weight:600;background:var(--gris-c)">
+      <td colspan="3">TOTAL de la sesión</td><td>${totItems}</td><td>${fmt(totUnid)}</td><td>${totEst?fmtMoney(totEst):'—'}</td>
+    </tr></tfoot></table>`;
+    document.getElementById('sesion-content').innerHTML = html;
+  }).catch(err=>{
+    document.getElementById('sesion-content').innerHTML = `<div class="empty-state">⚠️ No se pudo cargar el registro.<br><span style="font-size:11px">${escHtml(String(err))}</span></div>`;
+  });
+}
+function cerrarSesion(){ document.getElementById('sesion-overlay').classList.remove('open'); }
 </script>
 </body>
 </html>
