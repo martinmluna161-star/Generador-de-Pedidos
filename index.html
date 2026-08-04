@@ -256,6 +256,7 @@ input.comprar-input.tiene-valor{border-color:var(--teal);background:var(--teal-c
       <div class="card-tit">🗂️ ¿Qué tarea vas a hacer?</div>
       <div class="card-sub">Podés ir cambiando de tarea las veces que quieras — es solo una forma de mirar los mismos datos, no hace falta volver a cargar nada.</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <label class="chk-lbl"><input type="radio" name="tarea" value="compra_general" checked onchange="onTareaChange()"> Compra general (ambos depósitos)</label>
         <label class="chk-lbl"><input type="radio" name="tarea" value="pedidos_sl" onchange="onTareaChange()"> Pedidos San Luis</label>
         <label class="chk-lbl"><input type="radio" name="tarea" value="pedidos_vm" onchange="onTareaChange()"> Pedidos Villa Mercedes</label>
         <label class="chk-lbl"><input type="radio" name="tarea" value="abastecimiento" onchange="onTareaChange()"> Abastecimiento de depósito</label>
@@ -344,7 +345,7 @@ input.comprar-input.tiene-valor{border-color:var(--teal);background:var(--teal-c
 <div class="toast" id="toast"></div>
 
 <script>
-const API_URL = 'https://script.google.com/macros/s/AKfycbwxG7Vs54wMF1YwNT5AjaahZHpsDyVqgBzMMN49qB7e7CC78jNpjXfGvSf0jGRYdee5/exec';
+const API_URL = 'PEGAR_AQUI_LA_URL_DEL_APPS_SCRIPT';
 
 let archivosRaw = { stock_sl: null, stock_vm: null, ventas_sl: null, ventas_vm: null };
 let productos = [];
@@ -353,7 +354,7 @@ let preciosArr = [];
 let comprasManual = {};
 let pendientesManual = {};
 let cicloMeta = null;
-let tareaActual = 'pedidos_sl';       // elegida por el comprador: pedidos_sl | pedidos_vm | abastecimiento
+let tareaActual = 'compra_general';   // elegida por el comprador: compra_general | pedidos_sl | pedidos_vm | abastecimiento
 let destinoAbastecimiento = 'sl';     // solo aplica cuando tareaActual === 'abastecimiento'
 let providerRE = /\bS\.?\s?A\.?\b|\bSRL\b|\bS\.R\.L\.?\b|SOCIEDAD\s+AN[OÓ]NI/i;
 let saveTimer = null;
@@ -443,6 +444,7 @@ function etiquetaModo(m){
 function nombreDeposito(d){ return d === 'vm' ? 'Villa Mercedes' : 'San Luis'; }
 
 function etiquetaTarea(t, destino){
+  if(t === 'compra_general') return 'Compra general (ambos depósitos)';
   if(t === 'pedidos_sl') return 'Pedidos San Luis';
   if(t === 'pedidos_vm') return 'Pedidos Villa Mercedes';
   if(t === 'abastecimiento') return `Abastecimiento — reponiendo ${nombreDeposito(destino)} retirando de ${nombreDeposito(destino==='vm'?'sl':'vm')}`;
@@ -455,6 +457,15 @@ function etiquetaTarea(t, destino){
 // 4 archivos siempre — la "tarea" es solo un lente distinto sobre lo mismo.
 function calcularVista(p){
   const pendiente = toNum(pendientesManual[p.codigo]);
+  if(tareaActual === 'compra_general'){
+    // Analiza el stock y las ventas combinadas de ambos depósitos — para
+    // proveedores donde la compra se decide mirando el total, no depósito
+    // por depósito.
+    const diff = p.stock_total - p.ventas_total;
+    return { stockPrincipal: p.stock_total, stockSecundario: null, ventas: p.ventas_total, diff,
+      alerta: p.ventas_total > 0 && p.stock_total <= p.ventas_total,
+      sugerido: Math.max(0, Math.ceil(p.ventas_total - p.stock_total - pendiente)) };
+  }
   if(tareaActual === 'pedidos_sl'){
     const diff = p.stock_sl - p.ventas_sl;
     return { stockPrincipal: p.stock_sl, stockSecundario: null, ventas: p.ventas_sl, diff,
@@ -479,7 +490,7 @@ function calcularVista(p){
 
 function onTareaChange(){
   const radio = document.querySelector('input[name="tarea"]:checked');
-  tareaActual = radio ? radio.value : 'pedidos_sl';
+  tareaActual = radio ? radio.value : 'compra_general';
   destinoAbastecimiento = document.getElementById('cfg-destino-tarea').value;
   document.getElementById('destino-abastecimiento-wrap').style.display = (tareaActual==='abastecimiento') ? 'inline-flex' : 'none';
   try { localStorage.setItem(LS_TAREA, JSON.stringify({tarea:tareaActual, destino:destinoAbastecimiento})); } catch(e){}
@@ -490,7 +501,25 @@ function onTareaChange(){
 
 function renderThead(){
   const thead = document.getElementById('tabla-thead');
-  if(tareaActual === 'abastecimiento'){
+  if(tareaActual === 'compra_general'){
+    thead.innerHTML = `
+      <tr class="grp">
+        <th class="left" rowspan="2" style="background:var(--azul)">Proveedor / Producto</th>
+        <th colspan="3">Stock (u.)</th>
+        <th colspan="3">Ventas del período (u.)</th>
+        <th colspan="3">Diferencia (stock − ventas)</th>
+        <th rowspan="2">Precio unit.</th>
+        <th rowspan="2">Pend. entrega</th>
+        <th rowspan="2">Sugerido</th>
+        <th rowspan="2">A comprar</th>
+        <th rowspan="2">Estimado $</th>
+      </tr>
+      <tr>
+        <th>SL</th><th>VM</th><th>Total</th>
+        <th>SL</th><th>VM</th><th>Total</th>
+        <th>SL</th><th>VM</th><th>Total</th>
+      </tr>`;
+  } else if(tareaActual === 'abastecimiento'){
     const destEtq = nombreDeposito(destinoAbastecimiento);
     const origEtq = nombreDeposito(destinoAbastecimiento === 'vm' ? 'sl' : 'vm');
     thead.innerHTML = `
@@ -1037,7 +1066,7 @@ function renderTabla(){
 
   document.getElementById('count-pill').textContent = filtrados.length + ' productos';
 
-  const colspanVacio = tareaActual === 'abastecimiento' ? 10 : 9;
+  const colspanVacio = tareaActual === 'compra_general' ? 15 : (tareaActual === 'abastecimiento' ? 10 : 9);
   const body = document.getElementById('tbl-body');
   if(filtrados.length===0){
     body.innerHTML = `<tr><td colspan="${colspanVacio}"><div class="empty-state"><div class="ico">🔍</div>No hay productos que coincidan con los filtros.</div></td></tr>`;
@@ -1069,7 +1098,21 @@ function renderTabla(){
       </td>`;
     const sugerido = vista.sugerido;
 
-    if(tareaActual === 'abastecimiento'){
+    if(tareaActual === 'compra_general'){
+      html += `<tr class="${cls}">
+        ${celdaProducto}
+        <td>${fmt(p.stock_sl)}</td><td>${fmt(p.stock_vm)}</td><td><b>${fmt(p.stock_total)}</b></td>
+        <td>${fmt(p.ventas_sl)}</td><td>${fmt(p.ventas_vm)}</td><td><b>${fmt(p.ventas_total)}</b></td>
+        <td class="${p.diff_sl<0?'neg':'pos'}">${fmt(p.diff_sl)}</td>
+        <td class="${p.diff_vm<0?'neg':'pos'}">${fmt(p.diff_vm)}</td>
+        <td class="${vista.diff<0?'neg':'pos'}"><b>${fmt(vista.diff)}</b></td>
+        <td class="precio-txt ${precio?'':'sinprecio'}">${precio?fmtMoney(precio):'sin precio'}</td>
+        <td>${inputPendiente}</td>
+        <td class="sug-txt">${sugerido>0?fmt(sugerido):'—'}</td>
+        <td>${inputCompra}</td>
+        <td class="estimado-txt">${estimado!==null && estimado>0 ? fmtMoney(estimado) : '—'}</td>
+      </tr>`;
+    } else if(tareaActual === 'abastecimiento'){
       html += `<tr class="${cls}">
         ${celdaProducto}
         <td><b>${fmt(vista.stockPrincipal)}</b></td>
