@@ -700,28 +700,48 @@ function obtenerDescStock(row){
   return v1; // ya es texto real -> esta es la descripción
 }
 
-// Total / Camión / Depósito / Reservado / Disponible p/venta son, en el caso
-// normal, los últimos 10 valores de la fila (5 pares Bultos/Unid o
-// valor+etiqueta de unidad como "Kgs."/"Hormas"). Pero algunos productos
-// (típicamente los que no tienen Cód. Prov cargado) vienen sin la etiqueta
-// de unidad final, dejando celdas realmente vacías al final de la fila; en
-// ese caso Depósito/Reservado/Disponible son valores únicos (no pares),
-// ubicados justo antes de ese relleno en blanco.
+// Total / Camión / Depósito / Reservado / Disponible p/venta pueden venir en
+// distintos formatos según el producto y el export:
+//   - 10 valores numéricos: pares Bultos/Unid completos para las 5 métricas.
+//   - 7 valores: Total y Camión en pares, Depósito/Reservado/Disponible en
+//     valor único (pasa en algunos artículos sin Cód. Prov).
+//   - 5 valores: las 5 métricas en valor único, con etiqueta de unidad
+//     ("Kgs."/"Hormas") intercalada como texto entre medio.
+//   - 4 valores: igual que el anterior pero la columna Disponible p/venta
+//     directamente no viene en el archivo — hay que calcularla nosotros
+//     como Depósito − Reservado.
+// En todos los casos, filtrar solo los valores realmente numéricos (ignorando
+// texto y celdas vacías) desde la columna 3 en adelante permite reconocer el
+// formato sin depender de en qué columna exacta cae cada uno.
 function extraerStockValor(row, stockMode){
-  let ultimo = row.length - 1;
-  while(ultimo >= 0 && isBlank(row[ultimo])) ultimo--;
-  const sinRelleno = (ultimo === row.length - 1);
-
-  if(sinRelleno){
-    const n = row.length;
-    if(stockMode === 'disponible') return toNum(row[n-2]) + toNum(row[n-1]);
-    if(stockMode === 'deposito')   return toNum(row[n-6]) + toNum(row[n-5]);
-    return toNum(row[n-10]) + toNum(row[n-9]); // total
-  } else {
-    if(stockMode === 'disponible') return toNum(row[ultimo]);
-    if(stockMode === 'deposito')   return toNum(row[ultimo-2]);
-    return toNum(row[ultimo-6]) + toNum(row[ultimo-5]); // total (aprox.)
+  const nums = [];
+  for(let i=3;i<row.length;i++){
+    const v = row[i];
+    if(typeof v === 'number' && !isNaN(v)) nums.push(v);
   }
+  const n = nums.length;
+  let total, camion, deposito, reservado, disponible;
+
+  if(n >= 10){
+    const b = n - 10;
+    total = nums[b]+nums[b+1]; camion = nums[b+2]+nums[b+3];
+    deposito = nums[b+4]+nums[b+5]; reservado = nums[b+6]+nums[b+7];
+    disponible = nums[b+8]+nums[b+9];
+  } else if(n === 7){
+    total = nums[0]+nums[1]; camion = nums[2]+nums[3];
+    deposito = nums[4]; reservado = nums[5]; disponible = nums[6];
+  } else if(n === 5){
+    total = nums[0]; camion = nums[1]; deposito = nums[2]; reservado = nums[3]; disponible = nums[4];
+  } else if(n === 4){
+    total = nums[0]; camion = nums[1]; deposito = nums[2]; reservado = nums[3];
+    disponible = deposito - reservado; // no viene impresa: se calcula
+  } else {
+    total = camion = deposito = reservado = disponible = 0;
+  }
+
+  if(stockMode === 'disponible') return disponible;
+  if(stockMode === 'deposito') return deposito;
+  return total;
 }
 
 function parseStock(rows){
@@ -745,12 +765,17 @@ function parseStock(rows){
       continue;
     }
 
-    if(!isBlank(code) && !isBlank(desc)){
+    // Se acepta una fila de producto sin descripción (pasa en algunos
+    // exports para ciertos artículos) siempre que ya estemos dentro de la
+    // sección de un proveedor detectado — eso descarta la fila de título
+    // del reporte, que aparece antes de cualquier proveedor y también trae
+    // código+datos pero no es un producto real.
+    if(!isBlank(code) && (!isBlank(desc) || proveedorActual)){
       const codeStr = String(code).trim();
       if(codeStr === 'Cód.' || codeStr === 'Cód. Prov') continue;
 
       const valor = extraerStockValor(row, stockMode);
-      out.push({ codigo: codeStr, descripcion: String(desc).trim(), proveedor: proveedorActual, stock: valor });
+      out.push({ codigo: codeStr, descripcion: isBlank(desc) ? '' : String(desc).trim(), proveedor: proveedorActual, stock: valor });
     }
   }
   return out;
