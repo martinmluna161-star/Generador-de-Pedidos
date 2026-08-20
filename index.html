@@ -345,7 +345,7 @@ input.comprar-input.tiene-valor{border-color:var(--teal);background:var(--teal-c
 <div class="toast" id="toast"></div>
 
 <script>
-const API_URL = 'https://script.google.com/macros/s/AKfycbwxG7Vs54wMF1YwNT5AjaahZHpsDyVqgBzMMN49qB7e7CC78jNpjXfGvSf0jGRYdee5/exec';
+const API_URL = 'PEGAR_AQUI_LA_URL_DEL_APPS_SCRIPT';
 
 let archivosRaw = { stock_sl: null, stock_vm: null, ventas_sl: null, ventas_vm: null };
 let productos = [];
@@ -1218,18 +1218,30 @@ function descargarPedidoParcial(){
   const filtroLabel = provFiltro || 'Todos los proveedores';
   const tareaLabel = etiquetaTarea(tareaActual, destinoAbastecimiento);
 
-  exportarPedidos(items, tareaLabel, filtroLabel);
-
+  // Calculamos totales y guardamos los códigos ANTES de limpiar "A comprar".
   const unidades = items.reduce((s,p)=>s+toNum(comprasManual[p.codigo]),0);
   const estimado = items.reduce((s,p)=>{ const pr=preciosMap[p.codigo]; return s + (pr? pr*toNum(comprasManual[p.codigo]) : 0); },0);
   const codigos = items.map(p=>p.codigo);
+
+  exportarPedidos(items, tareaLabel, filtroLabel);
+
+  // Se limpia "A comprar" de lo recién exportado: si después se arma el
+  // pedido de otro depósito/tarea, no quedan números viejos puestos.
+  codigos.forEach(cod=>{
+    delete comprasManual[cod];
+    const p = productos.find(pp=>pp.codigo===cod);
+    if(p) p.a_comprar = 0;
+  });
+  renderKPIs();
+  renderTabla();
 
   apiPost({ action:'registrarExportacion', tarea: tareaLabel, filtro: filtroLabel, codigos,
             items: items.length, unidades, estimado }).then(res=>{
     if(res.ok){
       codigos.forEach(cod=>{ const p = productos.find(pp=>pp.codigo===cod); if(p) p.exportado = true; });
       renderTabla();
-      showToast(`Pedido descargado y anotado en el registro de la sesión ✓ (${items.length} producto(s))`);
+      showToast(`Pedido descargado ✓ (${items.length} producto(s)) — "A comprar" quedó en 0, listo para la próxima tarea`);
+      guardarComprasEnBackend();
     } else {
       showToast('El Excel se descargó, pero no se pudo anotar en el registro de sesión.', true);
     }
@@ -1319,9 +1331,29 @@ function exportarPedidos(items, tareaLabel, filtroLabel){
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
   });
 
-  const fecha = new Date().toISOString().slice(0,10);
-  const hora = new Date().toTimeString().slice(0,5).replace(':','');
-  XLSX.writeFile(wb, `Pedidos_Compra_CongeladosPuntanos_${fecha}_${hora}.xlsx`);
+  // Nombre del archivo: proveedor si el pedido es de uno solo, "Varios" si
+  // abarca más de un proveedor, o "Movimiento entre depósitos" cuando la
+  // tarea activa es Abastecimiento — más la fecha (y hora, para no
+  // pisar un archivo anterior si se descarga más de un pedido en el día).
+  const proveedoresDistintos = Object.keys(porProveedor);
+  let etiquetaArchivo;
+  if(tareaActual === 'abastecimiento'){
+    etiquetaArchivo = 'Movimiento entre depositos';
+  } else if(proveedoresDistintos.length === 1){
+    etiquetaArchivo = proveedoresDistintos[0];
+  } else {
+    etiquetaArchivo = 'Varios';
+  }
+  const etiquetaArchivoLimpia = etiquetaArchivo
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'') // sin acentos
+    .replace(/[\\\/\?\*\[\]:."]/g,'')
+    .replace(/\s+/g,'_')
+    .substring(0,60);
+
+  const ahoraFecha = new Date();
+  const fecha = `${String(ahoraFecha.getDate()).padStart(2,'0')}-${String(ahoraFecha.getMonth()+1).padStart(2,'0')}-${ahoraFecha.getFullYear()}`;
+  const hora = ahoraFecha.toTimeString().slice(0,5).replace(':','');
+  XLSX.writeFile(wb, `Pedido_${etiquetaArchivoLimpia}_${fecha}_${hora}.xlsx`);
 }
 
 // ══════════════════════════════════════════════════════════════════
